@@ -23,7 +23,7 @@ public class Slice {
     public int Size => Content.Size - OpenStart - OpenEnd;
 
     public Slice? InsertAt(int pos, Fragment fragment) {
-        var content = Content.InsertInto(pos + OpenStart, fragment);
+        var content = Content.InsertInto(pos + OpenStart, fragment, OpenStart + 1, OpenEnd + 1);
         return content is null ? null : new Slice(content, OpenStart, OpenEnd);
     }
 
@@ -80,22 +80,22 @@ public static class FragmentExtensions {
         return content.ReplaceChild(index, child!.Copy(child!.Content.RemoveRange(from - offset - 1, to - offset - 1)));
     }
 
-    public static Fragment? InsertInto(this Fragment content, int dist, Fragment insert, Node? parent = null) {
+    public static Fragment? InsertInto(this Fragment content, int dist, Fragment insert, int openStart = 0, int openEnd = 0, Node? parent = null) {
         var (index, offset) = content.FindIndex(dist);
         var child = content.MaybeChild(index);
         if (offset == dist || child!.IsText) {
-            if (parent is not null && !parent.CanReplace(index, index, insert)) return null;
+            if (parent is not null && openStart <= 0 && openEnd <= 0 && !parent.CanReplace(index, index, insert)) return null;
             return content.Cut(0, dist).Append(insert).Append(content.Cut(dist));
         }
-        var inner = child!.Content.InsertInto(dist - offset - 1, insert);
+        var inner = child!.Content.InsertInto(dist - offset - 1, insert, index == 0 ? openStart - 1 : 0, index == content.ChildCount - 1 ? openEnd - 1 : 0, child);
         return inner is null ? null : content.ReplaceChild(index, child!.Copy(inner));
     }
 }
 
 public static class ReplaceUtils {
     public static Node Replace(ResolvedPos from, ResolvedPos to, Slice slice) {
-        if (slice.OpenStart > from.Depth) throw new Exception("Inserted content deeper than insertion position");
-        if (from.Depth - slice.OpenStart != to.Depth - slice.OpenEnd) throw new Exception("Inconsistent open depths");
+        if (slice.OpenStart > from.Depth) throw new ReplaceException("Inserted content deeper than insertion position");
+        if (from.Depth - slice.OpenStart != to.Depth - slice.OpenEnd) throw new ReplaceException("Inconsistent open depths");
         return ReplaceOuter(from, to, slice, 0);
     }
 
@@ -156,7 +156,7 @@ public static class ReplaceUtils {
 
 
     public static Node Close(Node node, Fragment content) {
-        node.Type.CheckContent(content);
+        if (!node.Type.ValidContent(content)) throw new ReplaceException($"Invalid content for node {node.Type.Name}");
         return node.Copy(content);
     }
 

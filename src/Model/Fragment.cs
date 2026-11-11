@@ -205,7 +205,7 @@ public class Fragment {
     public RetIndex FindIndex(int pos, int round = -1) {
         if (pos == 0) return new RetIndex(0, pos);
         if (pos == Size) return new RetIndex(Content.Count, pos);
-        if (pos > Size || pos < 0) throw new Exception($"Position ${pos} outside of fragment ({this})");
+        if (pos > Size || pos < 0) throw new Exception($"Position {pos} outside of fragment ({this})");
         for (int i = 0, curPos = 0;; i++) {
             var cur = Child(i);
             var end = curPos + cur.NodeSize;
@@ -227,7 +227,7 @@ public class Fragment {
 
     public static Fragment FromJSON(Schema schema, List<NodeDto>? value) {
         if (value is null) return Fragment.Empty;
-        return new(value.Select(schema.NodeFromJSON).ToList());
+        return FromArray(value.Select(schema.NodeFromJSON).ToList());
     }
 
     public static Fragment FromArray(List<Node> array) {
@@ -279,8 +279,12 @@ public class Fragment {
 
             if (childA.IsText && childA is TextNode textChildA && childA.Text != childB.Text) {
                 if (childB is TextNode textChildB) {
-                    var minLength = Math.Min(textChildA.Text.Length, textChildB.Text.Length);
-                    for (var j = 0; j < minLength && textChildA.Text[j] == textChildB.Text[j]; j++) pos++;
+                    string tA = textChildA.Text, tB = textChildB.Text;
+                    var minLength = Math.Min(tA.Length, tB.Length);
+                    var j = 0;
+                    for (; j < minLength && tA[j] == tB[j]; j++) pos++;
+                    // Do not split a surrogate pair.
+                    if (j > 0 && j < tA.Length && j < tB.Length && char.IsHighSurrogate(tA[j - 1]) && char.IsLowSurrogate(tA[j])) pos--;
                 }
                 return pos;
             }
@@ -309,9 +313,12 @@ public class Fragment {
 
             if (childA.IsText && childA is TextNode textChildA && childA.Text != childB.Text) {
                 if (childB is TextNode textChildB) {
-                    int same = 0, minSize = Math.Min(textChildA.Text.Length, textChildB.Text.Length);
-                    while (same < minSize && textChildA.Text[textChildA.Text.Length - same - 1] == textChildB.Text[textChildB.Text.Length - same -1]) {
-                        same++; posA--; posB--;
+                    string tA = textChildA.Text, tB = textChildB.Text;
+                    int endA = tA.Length, endB = tB.Length;
+                    while (endA > 0 && endB > 0 && tA[endA - 1] == tB[endB - 1]) { endA--; endB--; posA--; posB--; }
+                    // Do not split a surrogate pair.
+                    if (endA > 0 && endB > 0 && endA < tA.Length && char.IsHighSurrogate(tA[endA - 1]) && char.IsLowSurrogate(tA[endA])) {
+                        posA++; posB++;
                     }
                 }
                 return (posA, posB);
