@@ -79,4 +79,19 @@ public class ResolvedPosTest {
         pThree.PosAtIndex(0, 0).Should().Be(0);
         pThree.PosAtIndex(1, 0).Should().Be(26);
     }
+
+    [Fact] public void Resolve_Does_Not_Keep_A_Document_Alive() {
+        var weak = ResolveInNewDoc();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.False(weak.IsAlive);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference ResolveInNewDoc() {
+        var d = doc(p("ab"));
+        d.Resolve(1);
+        return new WeakReference(d);
+    }
 }

@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 using OneOf;
 
 
@@ -6,7 +8,8 @@ namespace StepWise.Prose.Model;
 using PathList = List<OneOf<Node, int>>;
 
 public class ResolvedPos {
-    public static ResolveCache Cache { get; } = new();
+    // One cache per document, as the WeakMap in prosemirror-model. A document can be read from several threads.
+    static readonly ConditionalWeakTable<Node, ResolveCache> Caches = new();
 
     public int Pos { get; init; }
     public PathList Path { get; init; }
@@ -187,21 +190,25 @@ public class ResolvedPos {
     }
 
     public static ResolvedPos ResolveCached(Node doc, int pos) {
-        for (var i = 0; i < Cache.Cache.Length; i++) {
-            var cached = Cache.Cache[i];
-            if (cached is null) break;
-            if (cached.Pos == pos && ReferenceEquals(cached.Doc, doc)) return cached;
+        var cache = Caches.GetValue(doc, _ => new ResolveCache());
+        lock (cache) {
+            foreach (var cached in cache.Elements) {
+                if (cached is null) break;
+                if (cached.Pos == pos) return cached;
+            }
         }
         var result = Resolve(doc, pos);
-        Cache.Cache[Cache.Pos] = result;
-        Cache.Pos = (Cache.Pos + 1) % Cache.Cache.Length;
+        lock (cache) {
+            cache.Elements[cache.Index] = result;
+            cache.Index = (cache.Index + 1) % cache.Elements.Length;
+        }
         return result;
     }
 }
 
-public record ResolveCache {
-    public ResolvedPos[] Cache { get; } = new ResolvedPos[12];
-    public int Pos { get; set; } = 0;
+sealed class ResolveCache {
+    public ResolvedPos?[] Elements { get; } = new ResolvedPos?[12];
+    public int Index { get; set; }
 }
 
 
