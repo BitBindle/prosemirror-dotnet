@@ -9,7 +9,10 @@ using PathList = List<OneOf<Node, int>>;
 
 public class ResolvedPos {
     // One cache per document, as the WeakMap in prosemirror-model. A document can be read from several threads.
-    static readonly ConditionalWeakTable<Node, ResolveCache> Caches = new();
+    static readonly ConditionalWeakTable<Node, DocResolveCache> Caches = new();
+
+    [Obsolete("Not used. The resolve cache is now kept per document.")]
+    public static ResolveCache Cache { get; } = new();
 
     public int Pos { get; init; }
     public PathList Path { get; init; }
@@ -190,7 +193,7 @@ public class ResolvedPos {
     }
 
     public static ResolvedPos ResolveCached(Node doc, int pos) {
-        var cache = Caches.GetValue(doc, _ => new ResolveCache());
+        var cache = Caches.GetValue(doc, _ => new DocResolveCache());
         lock (cache) {
             foreach (var cached in cache.Elements) {
                 if (cached is null) break;
@@ -206,7 +209,13 @@ public class ResolvedPos {
     }
 }
 
-sealed class ResolveCache {
+[Obsolete("Not used. The resolve cache is now kept per document.")]
+public record ResolveCache {
+    public ResolvedPos[] Cache { get; } = new ResolvedPos[12];
+    public int Pos { get; set; } = 0;
+}
+
+sealed class DocResolveCache {
     public ResolvedPos?[] Elements { get; } = new ResolvedPos?[12];
     public int Index { get; set; }
 }
