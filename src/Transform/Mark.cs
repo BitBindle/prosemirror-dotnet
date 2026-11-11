@@ -91,8 +91,11 @@ public static partial class Mark {
         matched.ForEach(m => tr.Step(new RemoveMarkStep(m.from, m.to, m.style)));
     }
 
-    public static void ClearIncompatible(Transform tr, int pos, NodeType parentType, ContentMatch? match = null,
-                                         bool clearNewlines = true) {
+    public static void ClearIncompatible(Transform tr, int pos, NodeType parentType, ContentMatch? match = null) =>
+        ClearIncompatible(tr, pos, parentType, match, true);
+
+    public static void ClearIncompatible(Transform tr, int pos, NodeType parentType, ContentMatch? match,
+                                         bool clearNewlines) {
         match ??= parentType.ContentMatch;
         var node = tr.Doc.NodeAt(pos)!;
         var replSteps = new List<Step>();

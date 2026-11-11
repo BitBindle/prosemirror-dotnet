@@ -144,6 +144,11 @@ public class TransformSyncTest {
         Del(doc(ol(li(p("<a>One"), ol(li(p("Tw<b>o")))))),
             doc(ol(li(p("o")))));
 
+    [Fact] public void ReplaceRange_With_An_Empty_Slice_Deletes_Like_DeleteRange() {
+        var d = doc(blockquote(p("<a>a")), p("<b>b"));
+        Util.testTransform(new Transform(d).ReplaceRange(Tag(d, "a"), Tag(d, "b"), Slice.Empty), doc(p("b")));
+    }
+
     [Fact] public void DeleteRange_Deletes_Entire_Blocks_From_Textblock_Start_To_Textblock_Start() =>
         Del(doc(blockquote(ol(li(p("a")), li(p("<a>b")), li(p("c")))), p("x"), p("<b>y")),
             doc(blockquote(ol(li(p("a")))), p("y")));

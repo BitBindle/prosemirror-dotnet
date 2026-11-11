@@ -36,6 +36,9 @@ public class Attrs : Dictionary<string, JsonNode?> {
 }
 
 public class AttributeList : Dictionary<string, Attribute> {
+    [Obsolete("Pass the type name, so validation errors can name it.")]
+    public static AttributeList InitAttrs(Dictionary<string, AttributeSpec>? specList) => InitAttrs("", specList);
+
     public static AttributeList InitAttrs(string typeName, Dictionary<string, AttributeSpec>? specList) {
         var attrList = new AttributeList();
         if (specList is not null)
@@ -50,10 +53,10 @@ public class AttributeList : Dictionary<string, Attribute> {
     /// object, and use it for all nodes that don't specify specific
     /// attributes.
     /// </summary>
-    public Attrs DefaultAttrs() {
+    public Attrs? DefaultAttrs() {
         var defaultAttrs = new Attrs();
         foreach (var (name, attr) in this) {
-            if (!attr.HasDefault) return new Attrs();
+            if (!attr.HasDefault) return null;
             defaultAttrs[name] = attr.Default;
         }
         return defaultAttrs;
@@ -62,11 +65,12 @@ public class AttributeList : Dictionary<string, Attribute> {
     public Attrs ComputeAttrs(Attrs? value) {
         var built = new Attrs();
         foreach (var (name, attr) in this) {
-            if (!value?.ContainsKey(name) ?? true) {
+            // As in JavaScript, without an attrs object each value is null: it is validated, and no default applies.
+            if (value is not null && !value.ContainsKey(name)) {
                 if (attr.HasDefault) built[name] = attr.Default;
                 else throw new Exception($"No value supplied for attribute {name}");
             } else {
-                var given = value![name];
+                var given = value?[name];
                 attr.Validate?.Invoke(given);
                 built[name] = given;
             }
@@ -89,7 +93,7 @@ public enum WhiteSpace {
 public class NodeType {
     public List<string> Groups { get; init; }
     public AttributeList Attrs { get; init; }
-    public Attrs DefaultAttrs { get; init; }
+    public Attrs? DefaultAttrs { get; init; }
 
     /// <summary>The name the node type has in this schema.</summary>
     public string Name { get; init; }
@@ -284,6 +288,9 @@ public class Attribute {
     public bool IsRequired => !HasDefault;
     /// <summary>Throws when a value is not valid for this attribute.</summary>
     public Action<JsonNode?>? Validate { get; init; }
+
+    [Obsolete("Pass the type and attribute names, so validation errors can name them.")]
+    public Attribute(AttributeSpec spec) : this("", "", spec) {}
 
     public Attribute(string typeName, string attrName, AttributeSpec spec) {
         HasDefault =  !spec.Default.IsUndefined;
@@ -657,7 +664,7 @@ public class Schema {
     /// allowed.</summary>
     public TextNode Text(string text, List<Mark>? marks = null) {
         var type = Nodes["text"];
-        return new TextNode(type, type.DefaultAttrs, text, Model.Mark.SetFrom(marks!));
+        return new TextNode(type, type.DefaultAttrs!, text, Model.Mark.SetFrom(marks!));
     }
 
     /// <summary>Create a mark with the given type and attributes.</summary>

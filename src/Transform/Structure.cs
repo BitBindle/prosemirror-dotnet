@@ -118,9 +118,9 @@ public static class Structure {
     }
 
     public static void SetBlockType(Transform tr, int from, int to, NodeType type, Attrs? attrs) =>
-        SetBlockType(tr, from, to, type, _ => attrs);
+        SetBlockTypeWith(tr, from, to, type, _ => attrs);
 
-    public static void SetBlockType(Transform tr, int from, int to, NodeType type, Func<Node, Attrs?> attrs) {
+    public static void SetBlockTypeWith(Transform tr, int from, int to, NodeType type, Func<Node, Attrs?> attrs) {
         if (!type.IsTextBlock) throw new Exception("Type given to setBlockType should be a textblock");
         var mapFrom = tr.Steps.Count;
         tr.Doc.NodesBetween(from, to, (node, pos, _, _) => {

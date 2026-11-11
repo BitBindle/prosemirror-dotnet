@@ -80,7 +80,10 @@ public static class FragmentExtensions {
         return content.ReplaceChild(index, child!.Copy(child!.Content.RemoveRange(from - offset - 1, to - offset - 1)));
     }
 
-    public static Fragment? InsertInto(this Fragment content, int dist, Fragment insert, int openStart = 0, int openEnd = 0, Node? parent = null) {
+    public static Fragment? InsertInto(this Fragment content, int dist, Fragment insert, Node? parent = null) =>
+        InsertInto(content, dist, insert, 0, 0, parent);
+
+    public static Fragment? InsertInto(this Fragment content, int dist, Fragment insert, int openStart, int openEnd, Node? parent = null) {
         var (index, offset) = content.FindIndex(dist);
         var child = content.MaybeChild(index);
         if (offset == dist || child!.IsText) {

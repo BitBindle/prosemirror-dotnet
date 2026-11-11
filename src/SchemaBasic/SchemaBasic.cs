@@ -156,6 +156,7 @@ public static class BasicSchema {
 
         // Code font mark. Represented as a `<code>` element.
         ["code"] = new() {
+            Code = true,
             // parseDOM = [new() {tag = "code"}],
             // toDOM() new() { return codeDOM }
         }

@@ -26,7 +26,7 @@ public static class Replace {
         (type.Spec.Defining ?? false) || (type.Spec.DefiningForContent ?? false);
 
     public static Transform? ReplaceRange(Transform tr, int from, int to, Slice slice) {
-        if (slice.Size == 0) return tr.Delete(from, to);
+        if (slice.Size == 0) return tr.DeleteRange(from, to);
 
         ResolvedPos _from = tr.Doc.Resolve(from), _to = tr.Doc.Resolve(to);
         if (FitsTrivially(_from, _to, slice))

@@ -127,7 +127,7 @@ public class Transform {
     /// <summary>Like <see cref="SetBlockType(int, int, NodeType, Attrs?)"/> (a function argument in JavaScript), with the attributes
     /// computed from each old node.</summary>
     public Transform SetBlockTypeWith(int from, int to, NodeType type, Func<Node, Attrs?> attrs) {
-        Structure.SetBlockType(this, from, to, type, attrs);
+        Structure.SetBlockTypeWith(this, from, to, type, attrs);
         return this;
     }
 

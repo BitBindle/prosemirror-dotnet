@@ -112,4 +112,33 @@ public class CreateValidationTest {
             .Should().Throw<Exception>().WithMessage("Expected value of type number for attribute level on type heading, got string");
         new AttrStep(0, "level", JsonValue.Create(2)).Apply(doc).Doc!.FirstChild!.Attrs["level"]!.GetValue<int>().Should().Be(2);
     }
+
+    static readonly Schema required = new(new SchemaSpec {
+        Nodes = new OrderedDictionary<string, NodeSpec> {
+            ["doc"] = new() { Content = "x*" },
+            ["x"] = new() { Attrs = new() { ["a"] = new() { Validate = "number" }, ["b"] = new() { Default = JsonValue.Create(5) } } },
+            ["text"] = new() { },
+        },
+        Marks = new OrderedDictionary<string, MarkSpec> {
+            ["m"] = new() { Attrs = new() { ["a"] = new() { Validate = "number" } } },
+            ["n"] = new() { Attrs = new() { ["a"] = new() { }, ["b"] = new() { Default = JsonValue.Create(5) } } },
+        },
+    });
+
+    [Fact] public void NodeType_Create_Without_Attrs_Validates_A_Required_Attribute() =>
+        FluentActions.Invoking(() => required.Nodes["x"].Create())
+            .Should().Throw<Exception>().WithMessage("Expected value of type number for attribute a on type x, got null");
+
+    [Fact] public void MarkType_Create_Without_Attrs_Validates_A_Required_Attribute() =>
+        FluentActions.Invoking(() => required.Marks["m"].Create())
+            .Should().Throw<Exception>().WithMessage("Expected value of type number for attribute a on type m, got null");
+
+    [Fact] public void Create_Without_Attrs_Sets_Each_Attribute_To_Null_If_One_Is_Required() {
+        var attrs = required.Marks["n"].Create().Attrs;
+        attrs.Keys.Should().Equal("a", "b");
+        attrs.Values.Should().AllSatisfy(v => v.Should().BeNull());
+    }
+
+    [Fact] public void Schema_Basic_Code_Mark_Is_A_Code_Mark() =>
+        schema.Marks["code"].Spec.Code.Should().BeTrue();
 }
