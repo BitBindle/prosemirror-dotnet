@@ -42,6 +42,26 @@ public class Transform {
 
     public bool DocChanged => Steps.Count > 0;
 
+    /// <summary>Return a single range, in post-transform document positions,
+    /// that covers all content changed by this transform. Returns null
+    /// if no replacements are made. Note that this will ignore changes
+    /// that add/remove marks without replacing the underlying content.</summary>
+    public (int From, int To)? ChangedRange() {
+        int from = 1_000_000_000, to = -1_000_000_000;
+        for (var i = 0; i < Mapping.Maps.Count; i++) {
+            var map = Mapping.Maps[i];
+            if (i > 0) {
+                from = map.Map(from, 1);
+                to = map.Map(to, -1);
+            }
+            map.ForEach((_, _, fromB, toB) => {
+                from = Math.Min(from, fromB);
+                to = Math.Max(to, toB);
+            });
+        }
+        return from == 1_000_000_000 ? null : (from, to);
+    }
+
     public void AddStep(Step step, Node doc) {
         Docs.Add(Doc);
         Steps.Add(step);
@@ -104,6 +124,13 @@ public class Transform {
         return this;
     }
 
+    /// <summary>Like <see cref="SetBlockType(int, int, NodeType, Attrs?)"/> (a function argument in JavaScript), with the attributes
+    /// computed from each old node.</summary>
+    public Transform SetBlockTypeWith(int from, int to, NodeType type, Func<Node, Attrs?> attrs) {
+        Structure.SetBlockTypeWith(this, from, to, type, attrs);
+        return this;
+    }
+
     public Transform SetNodeMarkup(int pos, NodeType? type = null, Attrs? attrs = null, List<Model.Mark>? marks = null) {
         Structure.SetNodeMarkup(this, pos, type, attrs, marks);
         return this;
@@ -124,17 +151,24 @@ public class Transform {
         return this;
     }
 
+    /// <summary>Remove a mark (or all marks of the given type) from the node at
+    /// position <c>pos</c>.</summary>
     public Transform RemoveNodeMark(int pos, OneOf<Model.Mark, MarkType> mark) {
-        Model.Mark? _mark;
-        if (mark.Value is MarkType markType) {
-            var node = Doc.NodeAt(pos);
-            if (node is null) throw new Exception($"No node at position {pos}");
-            _mark = markType.IsInSet(node.Marks)!;
-            if (_mark is null) return this;
+        var node = Doc.NodeAt(pos);
+        if (node is null) throw new Exception($"No node at position {pos}");
+        if (mark.Value is Model.Mark _mark) {
+            if (_mark.IsInSet(node.Marks)) Step(new RemoveNodeMarkStep(pos, _mark));
         } else {
-            _mark = (Model.Mark)mark.Value;
+            var markType = (MarkType)mark.Value;
+            var set = node.Marks;
+            var steps = new List<Step>();
+            Model.Mark? found;
+            while ((found = markType.IsInSet(set)) is not null) {
+                steps.Add(new RemoveNodeMarkStep(pos, found));
+                set = found.RemoveFromSet(set);
+            }
+            for (var i = steps.Count - 1; i >= 0; i--) Step(steps[i]);
         }
-        Step(new RemoveNodeMarkStep(pos, _mark));
         return this;
     }
 
@@ -159,7 +193,7 @@ public class Transform {
     }
 
     public Transform ClearIncompatible(int pos, NodeType parentType, ContentMatch? match = null) {
-        Mark.ClearIncompatible(this, pos, parentType, match);
+        Mark.ClearIncompatible(this, pos, parentType, match, true);
         return this;
     }
 }

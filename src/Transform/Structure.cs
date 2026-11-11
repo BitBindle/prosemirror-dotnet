@@ -13,12 +13,14 @@ public static class Structure {
     public static int? LiftTarget(NodeRange range) {
         var parent = range.Parent;
         var content = parent.Content.CutByIndex(range.StartIndex, range.EndIndex);
-        for (var depth = range.Depth;; --depth) {
+        for (int depth = range.Depth, contentBefore = 0, contentAfter = 0;; --depth) {
             var node = range.From.Node(depth);
-            int index = range.From.Index(depth), endIndex = range.To.IndexAfter(depth);
+            int index = range.From.Index(depth) + contentBefore, endIndex = range.To.IndexAfter(depth) - contentAfter;
             if (depth < range.Depth && node.CanReplace(index, endIndex, content))
                 return depth;
             if (depth == 0 || (node.Type.Spec.Isolating ?? false) || !CanCut(node, index, endIndex)) break;
+            if (index > 0) contentBefore = 1;
+            if (endIndex < node.ChildCount) contentAfter = 1;
         }
         return null;
     }
@@ -115,23 +117,58 @@ public static class Structure {
         tr.Step(new ReplaceAroundStep(start, end, start, end, new Slice(content, 0, 0), wrappers.Count, true));
     }
 
-    public static void SetBlockType(Transform tr, int from, int to, NodeType type, Attrs? attrs) {
+    public static void SetBlockType(Transform tr, int from, int to, NodeType type, Attrs? attrs) =>
+        SetBlockTypeWith(tr, from, to, type, _ => attrs);
+
+    public static void SetBlockTypeWith(Transform tr, int from, int to, NodeType type, Func<Node, Attrs?> attrs) {
         if (!type.IsTextBlock) throw new Exception("Type given to setBlockType should be a textblock");
         var mapFrom = tr.Steps.Count;
         tr.Doc.NodesBetween(from, to, (node, pos, _, _) => {
-            if (node.IsTextBlock && !node.HasMarkup(type, attrs) && CanChangeType(tr.Doc, tr.Mapping.Slice(mapFrom).Map(pos), type)) {
-            // Ensure all markup that isn't allowed in the new node type is cleared
-                tr.ClearIncompatible(tr.Mapping.Slice(mapFrom).Map(pos, 1), type);
+            var attrsHere = attrs(node);
+            if (node.IsTextBlock && !node.HasMarkup(type, attrsHere) && CanChangeType(tr.Doc, tr.Mapping.Slice(mapFrom).Map(pos), type)) {
+                bool? convertNewlines = null;
+                if (type.Schema.LinebreakReplacement is not null) {
+                    var pre = type.WhiteSpace == WhiteSpace.Pre;
+                    var supportLinebreak = type.ContentMatch.MatchType(type.Schema.LinebreakReplacement) is not null;
+                    if (pre && !supportLinebreak) convertNewlines = false;
+                    else if (!pre && supportLinebreak) convertNewlines = true;
+                }
+                // Ensure all markup that isn't allowed in the new node type is cleared
+                if (convertNewlines == false) ReplaceLinebreaks(tr, node, pos, mapFrom);
+                Mark.ClearIncompatible(tr, tr.Mapping.Slice(mapFrom).Map(pos, 1), type, null, convertNewlines is null);
                 var mapping = tr.Mapping.Slice(mapFrom);
                 var startM = mapping.Map(pos, 1);
                 var endM = mapping.Map(pos + node.NodeSize, 1);
                 tr.Step(new ReplaceAroundStep(startM, endM, startM + 1, endM - 1,
-                                                new Slice(Fragment.From(type.Create(attrs, null, node.Marks)), 0, 0), 1, true));
+                                              new Slice(Fragment.From(type.Create(attrsHere, null, node.Marks)), 0, 0), 1, true));
+                if (convertNewlines == true) ReplaceNewlines(tr, node, pos, mapFrom);
                 return false;
             }
             return true;
         });
     }
+
+    static void ReplaceNewlines(Transform tr, Node node, int pos, int mapFrom) {
+        node.ForEach((child, offset, _) => {
+            if (child.IsText) {
+                foreach (System.Text.RegularExpressions.Match m in NewlineRegex.Matches(child.Text!)) {
+                    var start = tr.Mapping.Slice(mapFrom).Map(pos + 1 + offset + m.Index);
+                    tr.ReplaceWith(start, start + 1, node.Type.Schema.LinebreakReplacement!.Create());
+                }
+            }
+        });
+    }
+
+    static void ReplaceLinebreaks(Transform tr, Node node, int pos, int mapFrom) {
+        node.ForEach((child, offset, _) => {
+            if (ReferenceEquals(child.Type, child.Type.Schema.LinebreakReplacement)) {
+                var start = tr.Mapping.Slice(mapFrom).Map(pos + 1 + offset);
+                tr.ReplaceWith(start, start + 1, node.Type.Schema.Text("\n"));
+            }
+        });
+    }
+
+    static readonly System.Text.RegularExpressions.Regex NewlineRegex = new("\r?\n|\r");
 
     public static bool CanChangeType(Node doc, int pos, NodeType type) {
         var _pos = doc.Resolve(pos);
@@ -201,8 +238,23 @@ public static class Structure {
             _pos.Parent.CanReplace(index, index + 1);
     }
 
+    static bool CanAppendWithSubstitutedLinebreaks(Node a, Node b) {
+        // prosemirror-transform 1.10 discards this result too; kept for the same behaviour.
+        if (b.Content.Size == 0) a.Type.CompatibleContent(b.Type);
+        ContentMatch? match = a.ContentMatchAt(a.ChildCount);
+        var linebreakReplacement = a.Type.Schema.LinebreakReplacement;
+        for (var i = 0; i < b.ChildCount; i++) {
+            var child = b.Child(i);
+            var type = ReferenceEquals(child.Type, linebreakReplacement) ? a.Type.Schema.Nodes["text"] : child.Type;
+            match = match.MatchType(type);
+            if (match is null) return false;
+            if (!a.Type.AllowsMarks(child.Marks)) return false;
+        }
+        return match.ValidEnd;
+    }
+
     private static bool Joinable(Node? a, Node? b) =>
-        a is not null && b is not null && !a.IsLeaf && a.CanAppend(b);
+        a is not null && b is not null && !a.IsLeaf && CanAppendWithSubstitutedLinebreaks(a, b);
 
     public static int? JoinPoint(Node doc, int pos, int dir = -1) {
         var _pos = doc.Resolve(pos);
@@ -229,8 +281,31 @@ public static class Structure {
     }
 
     public static void Join(Transform tr, int pos, int depth) {
-        var step = new ReplaceStep(pos - depth, pos + depth, Slice.Empty, true);
-        tr.Step(step);
+        bool? convertNewlines = null;
+        var linebreakReplacement = tr.Doc.Type.Schema.LinebreakReplacement;
+        var before = tr.Doc.Resolve(pos - depth);
+        var beforeType = before.Node(null).Type;
+        if (linebreakReplacement is not null && beforeType.InlineContent) {
+            var pre = beforeType.WhiteSpace == WhiteSpace.Pre;
+            var supportLinebreak = beforeType.ContentMatch.MatchType(linebreakReplacement) is not null;
+            if (pre && !supportLinebreak) convertNewlines = false;
+            else if (!pre && supportLinebreak) convertNewlines = true;
+        }
+        var mapFrom = tr.Steps.Count;
+        if (convertNewlines == false) {
+            var after = tr.Doc.Resolve(pos + depth);
+            ReplaceLinebreaks(tr, after.Node(null), after.Before(null), mapFrom);
+        }
+        if (beforeType.InlineContent)
+            Mark.ClearIncompatible(tr, pos + depth - 1, beforeType,
+                                   before.Node(null).ContentMatchAt(before.Index()), convertNewlines is null);
+        var mapping = tr.Mapping.Slice(mapFrom);
+        var start = mapping.Map(pos - depth);
+        tr.Step(new ReplaceStep(start, mapping.Map(pos + depth, -1), Slice.Empty, true));
+        if (convertNewlines == true) {
+            var full = tr.Doc.Resolve(start);
+            ReplaceNewlines(tr, full.Node(null), full.Before(null), tr.Steps.Count);
+        }
     }
 
     public static int? InsertPoint(Node doc, int pos, NodeType nodeType) {
