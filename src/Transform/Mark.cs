@@ -91,7 +91,8 @@ public static partial class Mark {
         matched.ForEach(m => tr.Step(new RemoveMarkStep(m.from, m.to, m.style)));
     }
 
-    public static void ClearIncompatible(Transform tr, int pos, NodeType parentType, ContentMatch? match = null) {
+    public static void ClearIncompatible(Transform tr, int pos, NodeType parentType, ContentMatch? match = null,
+                                         bool clearNewlines = true) {
         match ??= parentType.ContentMatch;
         var node = tr.Doc.NodeAt(pos)!;
         var replSteps = new List<Step>();
@@ -107,7 +108,7 @@ public static partial class Mark {
                 for (var j = 0; j < child.Marks.Count; j++) if (!parentType.AllowsMarkType(child.Marks[j].Type))
                     tr.Step(new RemoveMarkStep(cur, end, child.Marks[j]));
 
-                if (child.IsText && !(parentType.Spec.Code ?? false)) {
+                if (clearNewlines && child.IsText && parentType.WhiteSpace != WhiteSpace.Pre) {
                     var newLine = _NewLineRegex();
                     Slice? slice = null;
                     foreach (var m in newLine.Matches(child.Text!).ToList()) {

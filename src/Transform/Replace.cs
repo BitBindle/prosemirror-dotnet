@@ -32,7 +32,7 @@ public static class Replace {
         if (FitsTrivially(_from, _to, slice))
             return tr.Step(new ReplaceStep(from, to, slice));
 
-        var targetDepths = CoveredDepths(_from, tr.Doc.Resolve(to));
+        var targetDepths = CoveredDepths(_from, _to);
 
         if (targetDepths.Count > 0 && targetDepths[^1] == 0) targetDepths.RemoveAt(targetDepths.Count - 1);
 
@@ -118,6 +118,23 @@ public static class Replace {
 
     public static Transform? DeleteRange(Transform tr, int from, int to) {
         ResolvedPos _from = tr.Doc.Resolve(from), _to = tr.Doc.Resolve(to);
+
+        // When the deleted range spans from the start of one textblock to
+        // the start of another one, move out of the start of both blocks.
+        if (_from.Parent.IsTextBlock && _to.Parent.IsTextBlock && _from.Start() != _to.Start() &&
+            _from.ParentOffset == 0 && _to.ParentOffset == 0) {
+            var shared = _from.SharedDepth(to);
+            var isolated = false;
+            for (var d = _from.Depth; d > shared; d--) if (_from.Node(d).Type.Spec.Isolating ?? false) isolated = true;
+            for (var d = _to.Depth; d > shared; d--) if (_to.Node(d).Type.Spec.Isolating ?? false) isolated = true;
+            if (!isolated) {
+                for (var d = _from.Depth; d > 0 && from == _from.Start(d); d--) from = _from.Before(d);
+                for (var d = _to.Depth; d > 0 && to == _to.Start(d); d--) to = _to.Before(d);
+                _from = tr.Doc.Resolve(from);
+                _to = tr.Doc.Resolve(to);
+            }
+        }
+
         var covered = CoveredDepths(_from, _to);
         for (var i = 0; i < covered.Count; i++) {
             var depth = covered[i];
@@ -128,8 +145,9 @@ public static class Replace {
                 return tr.Delete(_from.Before(depth), _to.After(depth));
         }
         for (var d = 1; d <= _from.Depth && d <= _to.Depth; d++) {
-            if (from - _from.Start(d) == _from.Depth - d && to > _from.End(d) && _to.End(d) - to != _to.Depth - d)
-            return tr.Delete(_from.Before(d), to);
+            if (from - _from.Start(d) == _from.Depth - d && to > _from.End(d) && _to.End(d) - to != _to.Depth - d &&
+                _from.Start(d - 1) == _to.Start(d - 1) && _from.Node(d - 1).CanReplace(_from.Index(d - 1), _to.Index(d - 1)))
+                return tr.Delete(_from.Before(d), to);
         }
         tr.Delete(from, to);
         return null;
@@ -270,11 +288,18 @@ file class Fitter {
         var content = Unplaced.Content;
         var openStart = Unplaced.OpenStart;
         var openEnd = Unplaced.OpenEnd;
-        var inner = ContentAt(content, openStart);
-        if (inner.ChildCount == 0 || inner.FirstChild!.IsLeaf) return false;
-        Unplaced = new Slice(content, openStart + 1,
-                             Math.Max(openEnd, inner.Size + openStart >= content.Size - openEnd ? openStart + 1 : 0));
+        if (MaxOpen(content, -1) <= openStart) return false;
+        if (Unplaced.Size > 1 && MaxOpen(content, 1) > openEnd) openEnd++;
+        Unplaced = new Slice(content, openStart + 1, openEnd);
         return true;
+    }
+
+    static int MaxOpen(Fragment frag, int side) {
+        for (var count = 0;; count++) {
+            var ch = side < 0 ? frag.FirstChild : frag.LastChild;
+            if (ch is null || ch.IsAtom) return count;
+            frag = ch.Content;
+        }
     }
 
     public bool DropNode() {
