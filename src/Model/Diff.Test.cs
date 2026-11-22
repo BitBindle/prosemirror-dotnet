@@ -1,6 +1,5 @@
 using System.Text.Json;
 
-using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -24,7 +23,7 @@ public class DiffTest {
 
     private static void start(Node a, Node b) {
         int? tag = a.Tag().TryGetValue("a", out var aTag) ? aTag : null;
-        a.Content.FindDiffStart(b.Content).Should().Be(tag);
+        Assert.Equal(tag, a.Content.FindDiffStart(b.Content));
     }
 
     [Fact] public void Returns_Null_For_Identical_Nodes() {
@@ -66,7 +65,7 @@ public class DiffTest {
 
     private static void end(Node a, Node b) {
         int? tag = a.Tag().TryGetValue("a", out var aTag) ? aTag : null;
-        a.Content.FindDiffEnd(b.Content)?.a!.Should().Be(tag);
+        Assert.Equal(tag, a.Content.FindDiffEnd(b.Content)?.a!);
     }
 
     [Fact] public void Returns_Null_When_There_Is_No_Difference() {

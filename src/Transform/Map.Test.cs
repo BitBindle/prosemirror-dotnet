@@ -1,6 +1,5 @@
 using System.Text.Json;
 
-using FluentAssertions;
 using OneOf;
 using Xunit;
 using Xunit.Abstractions;
@@ -40,18 +39,18 @@ public class MappingTest {
             tCase.Switch(
                 a => {
                     var (from, to) = a;
-                    mapping.Map(from, 1).Should().Be(to);
-                    inverted.Map(to, 1).Should().Be(from);
+                    Assert.Equal(to, mapping.Map(from, 1));
+                    Assert.Equal(from, inverted.Map(to, 1));
                 },
                 b => {
                     var (from, to, bias) = b;
-                    mapping.Map(from, bias).Should().Be(to);
-                    inverted.Map(to, bias).Should().Be(from);
+                    Assert.Equal(to, mapping.Map(from, bias));
+                    Assert.Equal(from, inverted.Map(to, bias));
                 },
                 c => {
                     var (from, to, bias, lossy) = c;
-                    mapping.Map(from, bias).Should().Be(to);
-                    if (!lossy) inverted.Map(to, bias).Should().Be(from);
+                    Assert.Equal(to, mapping.Map(from, bias));
+                    if (!lossy) Assert.Equal(from, inverted.Map(to, bias));
                 }
             );
         }
@@ -64,7 +63,7 @@ public class MappingTest {
         if (r.DeletedBefore) found += "b";
         if (r.DeletedAfter) found += "a";
         if (r.DeletedAcross) found += "x";
-        found.Should().Be(flags);
+        Assert.Equal(flags, found);
     }
 
     public Mapping mk(params OneOf<(int, int, int), Dictionary<int, int>>[] args) {

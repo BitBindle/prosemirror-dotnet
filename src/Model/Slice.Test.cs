@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -29,9 +28,9 @@ public class SliceTest {
         int? tagB = doc.Tag().ContainsKey("b") ? doc.Tag()["b"] : null;
 
         var slice = doc.Slice(doc.Tag().GetValueOrDefault("a"), tagB);
-        slice.Content.Eq(expect.Content).Should().BeTrue();
-        slice.OpenStart.Should().Be(openStart);
-        slice.OpenEnd.Should().Be(openEnd);
+        Assert.True(slice.Content.Eq(expect.Content));
+        Assert.Equal(openStart, slice.OpenStart);
+        Assert.Equal(openEnd, slice.OpenEnd);
     }
 
    [Fact] public void Can_Cut_Half_A_Paragraph() =>

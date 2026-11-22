@@ -1,6 +1,5 @@
 using System.Text.Json;
 
-using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -70,9 +69,9 @@ public class StructureTest {
         doc.Resolve(pos).BlockRange(end is null ? null : doc.Resolve(end.Value));
 
     private static void yes(int pos, int? depth = null, string? after = null) =>
-        CanSplit(doc, pos, depth, after is null ? null : new() {new(schema.Nodes[after], null)}).Should().BeTrue();
+        Assert.True(CanSplit(doc, pos, depth, after is null ? null : new() {new(schema.Nodes[after], null)}));
     private static void no(int pos, int? depth = null, string? after = null) =>
-        CanSplit(doc, pos, depth, after is null ? null : new() {new(schema.Nodes[after], null)}).Should().BeFalse();
+        Assert.False(CanSplit(doc, pos, depth, after is null ? null : new() {new(schema.Nodes[after], null)}));
 
     [Fact] public void Cant_At_Start() => no(0);
     [Fact] public void Cant_In_Head() => no(3);
@@ -100,16 +99,16 @@ public class StructureTest {
         nodes.SetValue("doc", new() {Content = "chapter+"});
 
         var s = new Schema(new() {Nodes = nodes});
-        CanSplit(s.Node("doc", null, s.Node("chapter", null, [
+        Assert.False(CanSplit(s.Node("doc", null, s.Node("chapter", null, [
             s.Node("title", null, s.Text("title")),
             s.Node("scene", null, s.Node("para", null, s.Text("scene")))
-        ])), 4, 1, new(){new(s.Nodes["scene"], null)}).Should().BeFalse();
+        ])), 4, 1, new(){new(s.Nodes["scene"], null)}));
     }
 
     private static void yesLift(int pos) {
-        var r = range(pos); (r is not null && LiftTarget(r) > 0).Should().BeTrue(); }
+        var r = range(pos); Assert.True(r is not null && LiftTarget(r) > 0); }
     private static void noLift(int pos) {
-        var r = range(pos); (r is not null && LiftTarget(r) > 0).Should().BeFalse(); }
+        var r = range(pos); Assert.False(r is not null && LiftTarget(r) > 0); }
 
     [Fact] public void Cant_At_The_Start_Of_The_Doc() => noLift(0);
     [Fact] public void Cant_In_The_Heading() => noLift(3);
@@ -119,9 +118,9 @@ public class StructureTest {
     [Fact] public void Cant_In_A_Section_Head() => noLift(86);
 
     private static void yesWrap(int pos, int end, string type) {
-        var r = range(pos, end); (r is not null && FindWrapping(r, schema.Nodes[type]) is not null).Should().BeTrue(); }
+        var r = range(pos, end); Assert.True(r is not null && FindWrapping(r, schema.Nodes[type]) is not null); }
     private static void noWrap(int pos, int end, string type) {
-        var r = range(pos, end); (r is not null && FindWrapping(r, schema.Nodes[type]) is not null).Should().BeFalse(); }
+        var r = range(pos, end); Assert.False(r is not null && FindWrapping(r, schema.Nodes[type]) is not null); }
 
     [Fact] public void Can_Wrap_The_Whole_Doc_In_A_Section() => yesWrap(0, 92, "sect");
     [Fact] public void Cant_Wrap_A_Head_Before_A_Para_In_A_Section() => noWrap(4, 4, "sect");
@@ -133,7 +132,7 @@ public class StructureTest {
     private static void repl(Node doc, int from, int to, Node? content, int openStart, int openEnd, Node result) {
         var slice = content is not null ? new Slice(content.Content, openStart, openEnd) : Slice.Empty;
         var tr = new Transform(doc).Replace(from, to, slice);
-        tr.Doc.Eq(result).Should().BeTrue();
+        Assert.True(tr.Doc.Eq(result));
     }
 
    [Fact] public void Automatically_Adds_A_Heading_To_A_Section()  =>

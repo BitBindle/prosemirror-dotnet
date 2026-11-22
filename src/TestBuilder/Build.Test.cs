@@ -1,6 +1,5 @@
 using System.Text.Json;
 
-using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -55,15 +54,15 @@ public class TestBuilderTest : IDisposable {
         var actual = doc(p(a(new {href = "/foo"}, a(new {href = "/foo"}, "click <p>here"))));
         var expected = doc(p(a(new {href = "/foo"}, "click <p>here")));
 
-        expected.Eq(actual).Should().BeTrue();
-        actual.NodeAt(actual.Tag()["p"])!.Marks.Count.Should().Be(1);
+        Assert.True(expected.Eq(actual));
+        Assert.Single(actual.NodeAt(actual.Tag()["p"])!.Marks);
     }
 
     [Fact]
     public void Marks_Of_Same_Type_But_Different_Attributes_Are_Distinct() {
         var actual = doc(p(a(new {href = "/foo"}, a(new{href = "/bar"}, "click <p>here"))));
 
-        actual.NodeAt(actual.Tag()["p"])!.Marks.Count.Should().Be(2);
+        Assert.Equal(2, actual.NodeAt(actual.Tag()["p"])!.Marks.Count);
     }
 
     public void Dispose() {

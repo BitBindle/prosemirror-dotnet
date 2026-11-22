@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -48,31 +47,31 @@ public class MarkTest {
     private static Mark customEm { get; } = custom["em"].Create();
     private static Mark customStrong { get; } = custom["strong"].Create();
 
-    [Fact] public void Returns_True_For_Two_Empty_Sets() => Mark.SameSet(new(), new()).Should().BeTrue();
+    [Fact] public void Returns_True_For_Two_Empty_Sets() => Assert.True(Mark.SameSet(new(), new()));
 
     [Fact] public void Returns_True_For_Simple_Identical_Sets() =>
-        Mark.SameSet(new() {em_, strong},new() {em_, strong}).Should().BeTrue();
+        Assert.True(Mark.SameSet(new() {em_, strong},new() {em_, strong}));
 
     [Fact] public void Returns_False_For_Different_Sets() =>
-        Mark.SameSet(new() {em_, strong}, new() {em_, code}).Should().BeFalse();
+        Assert.False(Mark.SameSet(new() {em_, strong}, new() {em_, code}));
 
     [Fact] public void Returns_False_When_Set_Size_Differs() =>
-        Mark.SameSet(new() {em_, strong}, new() {em_, strong, code}).Should().BeFalse();
+        Assert.False(Mark.SameSet(new() {em_, strong}, new() {em_, strong, code}));
 
     [Fact] public void Recognizes_Identical_Links_In_Set() =>
-        Mark.SameSet(new() {link("http://foo", null), code}, new() {link("http://foo", null), code}).Should().BeTrue();
+        Assert.True(Mark.SameSet(new() {link("http://foo", null), code}, new() {link("http://foo", null), code}));
 
     [Fact] public void Recognizes_Different_Links_In_Set() =>
-        Mark.SameSet(new() {link("http://foo", null), code}, new() {link("http://bar", null), code}).Should().BeFalse();
+        Assert.False(Mark.SameSet(new() {link("http://foo", null), code}, new() {link("http://bar", null), code}));
 
     [Fact] public void Considers_Identical_Links_To_Be_The_Same() =>
-        link("http://foo", null).Eq(link("http://foo", null)).Should().BeTrue();
+        Assert.True(link("http://foo", null).Eq(link("http://foo", null)));
 
     [Fact] public void Consider_Different_Links_To_Differ() =>
-        link("http://foo", null).Eq(link("http://bar", null)).Should().BeFalse();
+        Assert.False(link("http://foo", null).Eq(link("http://bar", null)));
 
     [Fact] public void Considers_Links_With_Different_Tittles_To_Differ() =>
-        link("http://foo", "A").Eq(link("http://foo", "B")).Should().BeFalse();
+        Assert.False(link("http://foo", "A").Eq(link("http://foo", "B")));
 
     [Fact] public void Can_Add_To_The_Empty_Set() =>
          ist(em_.AddToSet(new()), new List<Mark>() {em_}, Mark.SameSet);
@@ -139,7 +138,7 @@ public class MarkTest {
                           new() {link("http://foo", null)}));
 
     private static void isAt(Node doc, Mark mark, bool result) {
-        mark.IsInSet(doc.Resolve(doc.Tag()["a"]).Marks()).Should().Be(result);
+        Assert.Equal(result, mark.IsInSet(doc.Resolve(doc.Tag()["a"]).Marks()));
     }
 
    [Fact] public void Recognizes_A_Mark_Exists_Inside_Marked_Text() =>

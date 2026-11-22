@@ -1,6 +1,5 @@
 using System.Text.Json;
 
-using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -114,13 +113,13 @@ public class ProseContentTest {
         Fill3("paragraph{2}", doc(p()), doc(p()), doc(p()), null); }
 
     private void Valid(string expr, string types) {
-        Match(expr, types, schema).Should().BeTrue();
+        Assert.True(Match(expr, types, schema));
     }
 
     private void Fill(string expr, Node before, Node after, Node? result) {
         var filled = ContentMatch.Parse(expr, schema.Nodes).MatchFragment(before.Content)!.FillBefore(after.Content, true);
-        if (result is not null) filled!.Eq(result.Content).Should().BeTrue();
-        else filled.Should().BeNull();
+        if (result is not null) Assert.True(filled!.Eq(result.Content));
+        else Assert.Null(filled);
     }
 
     private void Fill3(string expr, Node before, Node mid, Node after, Node? left, Node? right = null){
@@ -128,15 +127,15 @@ public class ProseContentTest {
         var a = content.MatchFragment(before.Content)!.FillBefore(mid.Content);
         var b = a is not null ? content.MatchFragment(before.Content.Append(a).Append(mid.Content))!.FillBefore(after.Content, true) : null;
         if (left is not null) {
-            a!.Eq(left.Content).Should().BeTrue();
-            b!.Eq(right!.Content).Should().BeTrue();
+            Assert.True(a!.Eq(left.Content));
+            Assert.True(b!.Eq(right!.Content));
         } else {
-            b.Should().BeNull();
+            Assert.Null(b);
         }
     }
 
     private void Invalid(string expr, string types) {
-        Match(expr, types, schema).Should().BeFalse();
+        Assert.False(Match(expr, types, schema));
     }
 
     private bool Match(string expr, string types, Schema schema) {

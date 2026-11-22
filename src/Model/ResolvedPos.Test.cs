@@ -1,11 +1,9 @@
-using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
 
 namespace StepWise.Prose.Model.Test;
 
-using X = AssertionExtensions;
 using static StepWise.Prose.TestBuilder.Builder;
 
 public class ResolvedPosTest {
@@ -42,42 +40,42 @@ public class ResolvedPosTest {
         for (var pos = 0; pos <= testDoc.Content.Size; pos++) {
             var _pos = testDoc.Resolve(pos);
             var exp = expected[pos];
-            _pos.Depth.Should().Be(exp.Count - 4);
+            Assert.Equal(exp.Count - 4, _pos.Depth);
             for (var i = 0; i < exp.Count - 3; i++) {
-                X.Should(_pos!.Node(i)!.Eq(exp[i]!.node)).Be(true);
-                X.Should(_pos!.Start(i)).Be(exp[i]!.start);
-                X.Should(_pos!.End(i)).Be(exp[i]!.end);
+                Assert.True(_pos!.Node(i)!.Eq(exp[i]!.node));
+                Assert.Equal(exp[i]!.start, _pos!.Start(i));
+                Assert.Equal(exp[i]!.end, _pos!.End(i));
                 if (i > 0) {
-                    X.Should(_pos!.Before(i)).Be(exp[i]!.start - 1);
-                    X.Should(_pos!.After(i)).Be(exp[i]!.end + 1);
+                    Assert.Equal(exp[i]!.start - 1, _pos!.Before(i));
+                    Assert.Equal(exp[i]!.end + 1, _pos!.After(i));
                 }
             }
-            _pos.ParentOffset.Should().Be(exp[^3]);
+            Assert.Equal(exp[^3], _pos.ParentOffset);
             var before = _pos.NodeBefore!;
             var eBefore = exp[^2];
-            if (eBefore is string) before.TextContent.Should().Be(eBefore);
-            else before.Should().Be(eBefore);
+            if (eBefore is string) Assert.Equal(eBefore, before.TextContent);
+            else Assert.Equal(eBefore, before);
             var after = _pos.NodeAfter!;
             var eAfter = exp[^1];
-            if (eAfter is string) after.TextContent.Should().Be(eAfter);
-            else after.Should().Be(eAfter);
+            if (eAfter is string) Assert.Equal(eAfter, after.TextContent);
+            else Assert.Equal(eAfter, after);
         }
     }
 
     [Fact] public void Has_A_Working_PosAtIndex_Method() {
         var d = doc(blockquote(p("one"), blockquote(p("two ", em("three")), p("four"))));
         var pThree = d.Resolve(12); // Start of em("three")
-        pThree.PosAtIndex(0).Should().Be(8);
-        pThree.PosAtIndex(1).Should().Be(12);
-        pThree.PosAtIndex(2).Should().Be(17);
-        pThree.PosAtIndex(0, 2).Should().Be(7);
-        pThree.PosAtIndex(1, 2).Should().Be(18);
-        pThree.PosAtIndex(2, 2).Should().Be(24);
-        pThree.PosAtIndex(0, 1).Should().Be(1);
-        pThree.PosAtIndex(1, 1).Should().Be(6);
-        pThree.PosAtIndex(2, 1).Should().Be(25);
-        pThree.PosAtIndex(0, 0).Should().Be(0);
-        pThree.PosAtIndex(1, 0).Should().Be(26);
+        Assert.Equal(8, pThree.PosAtIndex(0));
+        Assert.Equal(12, pThree.PosAtIndex(1));
+        Assert.Equal(17, pThree.PosAtIndex(2));
+        Assert.Equal(7, pThree.PosAtIndex(0, 2));
+        Assert.Equal(18, pThree.PosAtIndex(1, 2));
+        Assert.Equal(24, pThree.PosAtIndex(2, 2));
+        Assert.Equal(1, pThree.PosAtIndex(0, 1));
+        Assert.Equal(6, pThree.PosAtIndex(1, 1));
+        Assert.Equal(25, pThree.PosAtIndex(2, 1));
+        Assert.Equal(0, pThree.PosAtIndex(0, 0));
+        Assert.Equal(26, pThree.PosAtIndex(1, 0));
     }
 
     [Fact] public void Resolve_Does_Not_Keep_A_Document_Alive() {

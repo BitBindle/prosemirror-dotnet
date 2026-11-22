@@ -1,4 +1,3 @@
-using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -104,7 +103,7 @@ public class ReplaceTest {
         var slice = insert is not null ? insert.Slice(insert.Tag()["a"], insert.Tag()["b"]) : Slice.Empty;
         var act = () =>
             doc.Replace(doc.Tag()["a"], doc.Tag()["b"], slice);
-        act.Should().Throw<Exception>().Where(e => regex.IsMatch(e.Message));
+        Assert.Matches(regex, Assert.ThrowsAny<Exception>(act).Message);
     }
 
    [Fact] public void Doesnt_Allow_The_Left_Side_To_Be_Too_Deep() =>

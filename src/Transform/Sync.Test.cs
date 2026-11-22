@@ -1,6 +1,5 @@
 using System.Text.Json.Nodes;
 
-using FluentAssertions;
 using Xunit;
 
 using StepWise.Prose.Model;
@@ -42,8 +41,7 @@ public class TransformSyncTest {
 
     [Fact] public void Replace_Around_Verifies_That_The_Inserted_Content_Fits() {
         var tr = new Transform(doc(p("a")));
-        FluentActions.Invoking(() => tr.Step(new ReplaceAroundStep(1, 2, 1, 2, new Slice(Fragment.From(blockquote()), 0, 0), 1, true)))
-            .Should().Throw<Exception>().WithMessage("*Content does not fit in gap*");
+        ThrowsWithMessage(() => tr.Step(new ReplaceAroundStep(1, 2, 1, 2, new Slice(Fragment.From(blockquote()), 0, 0), 1, true)), "*Content does not fit in gap*");
     }
 
     [Fact] public void Replace_Around_Considers_Slice_Openness() {
@@ -84,10 +82,10 @@ public class TransformSyncTest {
         });
         var para = s.Node("p", null, new List<Node> { s.Text("A") });
         var d = s.Node("doc", null, new List<Node> { s.Node("section", null, new List<Node> { s.Node("heading", null, new List<Node> { para, para, para }), para }) });
-        Structure.LiftTarget(d.Resolve(3).BlockRange()!).Should().BeNull();
-        Structure.LiftTarget(d.Resolve(6).BlockRange()!).Should().BeNull();
-        Structure.LiftTarget(d.Resolve(3).BlockRange(d.Resolve(6))!).Should().BeNull();
-        Structure.LiftTarget(d.Resolve(9).BlockRange()!).Should().Be(1);
+        Assert.Null(Structure.LiftTarget(d.Resolve(3).BlockRange()!));
+        Assert.Null(Structure.LiftTarget(d.Resolve(6).BlockRange()!));
+        Assert.Null(Structure.LiftTarget(d.Resolve(3).BlockRange(d.Resolve(6))!));
+        Assert.Equal(1, Structure.LiftTarget(d.Resolve(9).BlockRange()!));
     }
 
     [Fact] public void Join_Converts_Newlines_To_Line_Breaks() {
@@ -176,19 +174,19 @@ public class TransformSyncTest {
 
     [Fact] public void ChangedRange_Is_Null_Without_Changes() {
         var tr = new Transform(doc(p("hello")));
-        R(tr).Should().BeNull();
+        Assert.Null(R(tr));
         tr.AddMark(1, 3, schema.Mark("strong"));
-        R(tr).Should().BeNull();
+        Assert.Null(R(tr));
     }
 
     [Fact] public void ChangedRange_Covers_A_Change() =>
-        R(new Transform(doc(p("ab"))).Insert(3, schema.Text("c"))).Should().Be("3-4");
+        Assert.Equal("3-4", R(new Transform(doc(p("ab"))).Insert(3, schema.Text("c"))));
 
     [Fact] public void ChangedRange_Handles_Steps_That_Affect_Each_Other() =>
-        R(new Transform(doc(p("ab"))).Insert(3, schema.Text("c")).Insert(2, schema.Text("d")).Insert(1, schema.Text("e"))).Should().Be("1-6");
+        Assert.Equal("1-6", R(new Transform(doc(p("ab"))).Insert(3, schema.Text("c")).Insert(2, schema.Text("d")).Insert(1, schema.Text("e"))));
 
     [Fact] public void ChangedRange_Adjusts_For_Deletions_Before_An_Earlier_Step() =>
-        R(new Transform(doc(p("abcde"))).Insert(6, schema.Text("f")).Delete(1, 4)).Should().Be("1-4");
+        Assert.Equal("1-4", R(new Transform(doc(p("abcde"))).Insert(6, schema.Text("f")).Delete(1, 4)));
 
     [Fact] public void Drops_Steps_That_Produce_Invalid_Content() {
         var s = new Schema(new SchemaSpec {
@@ -204,7 +202,7 @@ public class TransformSyncTest {
         var tr1 = new Transform(d).Insert(2, s.Node("special"));
         var tr2 = new Transform(d).SetBlockType(1, 4, s.Nodes["heading"]);
         tr2.MaybeStep(tr1.Steps[0].Map(tr2.Mapping)!);
-        tr2.Steps.Count.Should().Be(1);
+        Assert.Single(tr2.Steps);
     }
 
     // prosemirror-transform 1.12.2: an insertion sets no deletion flag at its own position.
@@ -212,16 +210,16 @@ public class TransformSyncTest {
         var map = new StepMap([2, 0, 3]);
         foreach (var assoc in new[] { -1, 1 }) {
             var result = map.MapResult(2, assoc);
-            result.Pos.Should().Be(assoc < 0 ? 2 : 5);
-            (result.Deleted || result.DeletedBefore || result.DeletedAfter || result.DeletedAcross).Should().BeFalse();
+            Assert.Equal(assoc < 0 ? 2 : 5, result.Pos);
+            Assert.False(result.Deleted || result.DeletedBefore || result.DeletedAfter || result.DeletedAcross);
         }
-        new StepMap([2, 2, 0]).MapResult(2, 1).DeletedAfter.Should().BeTrue();
+        Assert.True(new StepMap([2, 2, 0]).MapResult(2, 1).DeletedAfter);
     }
 
     [Fact] public void An_Attr_Step_Stays_After_An_Insertion_Directly_Before_Its_Node() {
         var mapped = new AttrStep(2, "level", JsonValue.Create(2)).Map(new StepMap([2, 0, 3]));
-        mapped.Should().NotBeNull();
-        mapped!.Pos.Should().Be(5);
+        Assert.NotNull(mapped);
+        Assert.Equal(5, mapped!.Pos);
     }
 }
 
@@ -234,9 +232,9 @@ public class MapBiasTest {
         try {
             ReplaceStep.MapBias = -1;
             var mapped = (ReplaceStep)insertA.Steps[0].Map(insertB.Mapping)!;
-            mapped.From.Should().Be(2);
+            Assert.Equal(2, mapped.From);
             ReplaceStep.MapBias = 1;
-            ((ReplaceStep)insertA.Steps[0].Map(insertB.Mapping)!).From.Should().Be(3);
+            Assert.Equal(3, ((ReplaceStep)insertA.Steps[0].Map(insertB.Mapping)!).From);
         } finally {
             ReplaceStep.MapBias = 1;
         }
