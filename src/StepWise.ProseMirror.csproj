@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>StepWise.ProseMirror</PackageId>
-    <Version>0.1.0</Version>
+    <Version>1.5.0</Version>
     <Authors>ProTip</Authors>
     <Company>StepWise</Company>
     <Description>A direct translation of the core ProseMirror packages from TypeScript to C#</Description>
