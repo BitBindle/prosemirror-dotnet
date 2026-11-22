@@ -1,0 +1,80 @@
+name: Release
+
+# Manually triggered. Major.minor come from <Version> in src/StepWise.ProseMirror.csproj;
+# the patch number is the next free patch after the latest v<major>.<minor>.* tag.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      # Optional: when this secret is set, the package is also pushed to nuget.org.
+      NUGET_API_KEY: ${{ secrets.NUGET_API_PUB_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+          cache: false
+
+      - name: Determine version
+        id: version
+        run: |
+          project_version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/StepWise.ProseMirror.csproj | head -n1)
+          major_minor=$(echo "$project_version" | cut -d. -f1,2)
+          if ! [[ "$major_minor" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "Could not read major.minor from <Version> in the csproj (got '$project_version')" >&2
+            exit 1
+          fi
+          prefix="v${major_minor}."
+          latest_patch=$(git tag --list "${prefix}*" \
+            | sed -n "s/^${prefix//./\\.}\([0-9][0-9]*\)$/\1/p" \
+            | sort -n | tail -n1)
+          if [ -z "$latest_patch" ]; then patch=0; else patch=$((latest_patch + 1)); fi
+          version="${major_minor}.${patch}"
+          echo "Releasing $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore prosemirror-dotnet.sln
+
+      - name: Test
+        run: dotnet test prosemirror-dotnet.sln --no-restore --configuration Debug
+
+      - name: Pack
+        run: >
+          dotnet pack src/StepWise.ProseMirror.csproj
+          --configuration Release
+          --output artifacts
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:RepositoryCommit=${{ github.sha }}
+          -p:RepositoryBranch=${{ github.ref_name }}
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "v${{ steps.version.outputs.version }}"
+          --target "${{ github.sha }}"
+          --title "v${{ steps.version.outputs.version }}"
+          --generate-notes
+          artifacts/*.nupkg
+
+      - name: Push to NuGet
+        if: ${{ env.NUGET_API_KEY != '' }}
+        run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
