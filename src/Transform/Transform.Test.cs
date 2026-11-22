@@ -6,7 +6,6 @@ using Xunit.Abstractions;
 
 using StepWise.Prose.Model;
 using StepWise.Prose.TestBuilder;
-using DotNext.Collections.Generic;
 
 
 namespace StepWise.Prose.Transformation.Test;

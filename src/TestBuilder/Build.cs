@@ -2,7 +2,7 @@ using System.Dynamic;
 using System.Text.Json.Nodes;
 
 using OneOf;
-using DotNext;
+using System.Runtime.CompilerServices;
 
 using StepWise.Prose.Model;
 using StepWise.Prose.SchemaBasic;
@@ -23,13 +23,13 @@ public class MarkFlat {
 
     public MarkFlat(List<Node> flat, Tags tag) {
         Flat = flat;
-        this.GetUserData().Set(Builder.TagSlot, tag);
+        Builder.SetTag(this, tag);
     }
 }
 
 public static class BuilderNodeExtensions {
     public static Tags Tag(this Node node) =>
-        node.GetUserData().TryGet(Builder.TagSlot, out var tag) && tag is Tags tags ? tags : Builder.NoTag;
+        Builder.TryGetTag(node, out var tag) ? tag : Builder.NoTag;
 }
 
 public static class Builder {
@@ -41,7 +41,11 @@ public static class Builder {
         } set => _schema.Value = value;
     }
     public static Tags NoTag {get;} = new();
-    public static readonly UserDataSlot<Tags> TagSlot = new();
+    // Tags are attached to nodes and mark groups without changing their types.
+    private static readonly ConditionalWeakTable<object, Tags> _tags = new();
+    internal static void SetTag(object target, Tags tag) => _tags.AddOrUpdate(target, tag);
+    internal static bool TryGetTag(object target, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Tags? tag) =>
+        _tags.TryGetValue(target, out tag);
 
     public static Node doc(params ChildSpec[] nodes) => doc(new(), nodes);
     public static Node doc(Attrs attrs, params ChildSpec[] nodes) =>
@@ -132,7 +136,7 @@ public static class Builder {
         foreach (var (name, value) in suppliedAttrs) attrs[name] = value;
         var (nodes, tag) = Flatten(schema, children, n => n);
         var node = pType.Create(attrs, nodes);
-        if (!ReferenceEquals(tag, NoTag)) node.GetUserData().Set(TagSlot, tag);
+        if (!ReferenceEquals(tag, NoTag)) SetTag(node, tag);
         return node;
     }
 
@@ -171,7 +175,7 @@ public static class Builder {
                 pos += strChild.Length - at;
                 if (outText.Length > 0) result.Add(f(schema.Text(outText)));
             } else {
-                if (child.Value.GetUserData().TryGet(TagSlot, out var childTag) && !ReferenceEquals(childTag, NoTag)) {
+                if (TryGetTag(child.Value, out var childTag) && !ReferenceEquals(childTag, NoTag)) {
                     if (ReferenceEquals(tag, NoTag)) tag = new();
                     foreach (var (name, value) in childTag)
                         tag[name] = value
@@ -277,7 +281,7 @@ public static class Builder {
             foreach (var (name, value) in suppliedAttrs) attrs[name] = value;
             var (nodes, tag) = Flatten(schema, _children, n => n);
             var node = pType.Create(attrs, nodes);
-            if (!ReferenceEquals(tag, NoTag)) node.GetUserData().Set(TagSlot, tag);
+            if (!ReferenceEquals(tag, NoTag)) SetTag(node, tag);
             return node;
         }
         return builder;

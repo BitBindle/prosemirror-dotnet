@@ -2,7 +2,6 @@ using System.Collections;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-using DotNext;
 
 using StepWise.Prose.Collections;
 

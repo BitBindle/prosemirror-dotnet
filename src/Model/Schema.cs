@@ -3,7 +3,6 @@ using System.Text.Json.Serialization;
 
 using DotNext;
 using DotNext.Text.Json;
-using Json.More;
 using OneOf;
 
 
@@ -28,7 +27,7 @@ public class Attrs : Dictionary<string, JsonNode?> {
         // Do basic reference equality check.
         if (a.Select(kv => kv.Key).All(k => ReferenceEquals(a[k], b[k]))) return true;
         // Do deep equality check.
-        if (a.Select(kv => kv.Key).All(k => a[k].IsEquivalentTo(b[k]))) {
+        if (a.Select(kv => kv.Key).All(k => JsonNode.DeepEquals(a[k], b[k]))) {
             return true;
         }
 
