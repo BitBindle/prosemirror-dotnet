@@ -6,10 +6,11 @@ using DotNext.Text.Json;
 using Json.More;
 using OneOf;
 
-using StepWise.Prose.Collections;
 
 
 namespace StepWise.Prose.Model;
+
+using StepWise.Prose.Collections;
 
 /// <summary>
 /// An object holding the attributes of a node.

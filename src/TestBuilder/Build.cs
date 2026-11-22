@@ -4,13 +4,14 @@ using System.Text.Json.Nodes;
 using OneOf;
 using DotNext;
 
-using StepWise.Prose.Collections;
 using StepWise.Prose.Model;
 using StepWise.Prose.SchemaBasic;
 using System.Text.RegularExpressions;
 
 
 namespace StepWise.Prose.TestBuilder;
+
+using StepWise.Prose.Collections;
 
 using ChildSpec = OneOf<string, Node, MarkFlat>;
 using ChildSpec2 = OneOf<string, Node, List<Node>, MarkFlat, object>;

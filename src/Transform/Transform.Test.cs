@@ -4,13 +4,14 @@ using OneOf;
 using Xunit;
 using Xunit.Abstractions;
 
-using StepWise.Prose.Collections;
 using StepWise.Prose.Model;
 using StepWise.Prose.TestBuilder;
 using DotNext.Collections.Generic;
 
 
 namespace StepWise.Prose.Transformation.Test;
+
+using StepWise.Prose.Collections;
 
 using static Builder;
 using static StepWise.Prose.Test.TestUtils;

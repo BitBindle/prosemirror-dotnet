@@ -4,12 +4,13 @@ using FluentAssertions;
 using Xunit;
 using Xunit.Abstractions;
 
-using StepWise.Prose.Collections;
 using StepWise.Prose.Model;
 using StepWise.Prose.SchemaBasic;
 
 
 namespace StepWise.Prose.Transformation.Test;
+
+using StepWise.Prose.Collections;
 
 using static Structure;
 

@@ -3,11 +3,12 @@ using System.Text.Json.Nodes;
 using FluentAssertions;
 using Xunit;
 
-using StepWise.Prose.Collections;
 using StepWise.Prose.TestBuilder;
 using StepWise.Prose.Transformation;
 
 namespace StepWise.Prose.Model.Test;
+
+using StepWise.Prose.Collections;
 
 using static StepWise.Prose.TestBuilder.Builder;
 
