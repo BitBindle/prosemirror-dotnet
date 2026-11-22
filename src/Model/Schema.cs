@@ -575,7 +575,7 @@ public class AttributeSpec {
 public class Schema {
     /// <summary>The <see cref="SchemaSpec"/> on which the schema is based,
     /// with the added guarantee that its <c>nodes</c> and <c>marks</c>
-    /// properties are <see cref="OrderedDictionary{String, NodeSpec}"/> instances.</summary>
+    /// properties are <see cref="OrderedDictionary{TKey, TValue}"/> instances.</summary>
     public ActiveSchemaSpec Spec { get; init; }
 
     /// <summary>An object mapping the schema's node names to node type objects.</summary>

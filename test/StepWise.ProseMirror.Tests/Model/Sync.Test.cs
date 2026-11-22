@@ -7,7 +7,6 @@ using StepWise.Prose.Transformation;
 
 namespace StepWise.Prose.Model.Test;
 
-using StepWise.Prose.Collections;
 
 using static StepWise.Prose.TestBuilder.Builder;
 using static StepWise.Prose.Test.TestUtils;

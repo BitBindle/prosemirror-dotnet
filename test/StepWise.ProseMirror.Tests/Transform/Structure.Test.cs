@@ -8,7 +8,6 @@ using StepWise.Prose.SchemaBasic;
 
 namespace StepWise.Prose.Transformation.Test;
 
-using StepWise.Prose.Collections;
 
 using static Structure;
 
@@ -95,7 +94,7 @@ public class StructureTest {
         nodes.Add("title", new() {Content = "text*"});
         nodes.Add("chapter", new() {Content = "title scene+"});
         nodes.Add("scene", new() {Content = "para+"});
-        nodes.SetValue("doc", new() {Content = "chapter+"});
+        nodes["doc"] = new() {Content = "chapter+"};
 
         var s = new Schema(new() {Nodes = nodes});
         Assert.False(CanSplit(s.Node("doc", null, s.Node("chapter", null, [

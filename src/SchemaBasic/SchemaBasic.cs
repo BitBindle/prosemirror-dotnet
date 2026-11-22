@@ -4,7 +4,6 @@ using StepWise.Prose.SchemaList;
 
 namespace StepWise.Prose.SchemaBasic;
 
-using StepWise.Prose.Collections;
 
 // const pDOM: DOMOutputSpec = ["p", 0], blockquoteDOM: DOMOutputSpec = ["blockquote", 0],
 //             hrDOM: DOMOutputSpec = ["hr"], preDOM: DOMOutputSpec = ["pre", ["code", 0]],
