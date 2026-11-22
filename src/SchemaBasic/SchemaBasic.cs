@@ -46,7 +46,7 @@ public static class BasicSchema {
         // should hold the number 1 to 6. Parsed and serialized as `<h1>` to
         // `<h6>` elements.
         ["heading"] =  new() {
-            Attrs =  new() {["level"] =  new() {Default = new(1)}},
+            Attrs =  new() {["level"] =  new() {Default = new(1), Validate = "number"}},
             Content = "inline*",
             Group = "block",
             Defining = true,
@@ -83,9 +83,9 @@ public static class BasicSchema {
         ["image"] =  new() {
             Inline = true,
             Attrs =  new() {
-                ["src"] =  new() {},
-                ["alt"] =  new() {Default = null},
-                ["title"] =  new() {Default = null}
+                ["src"] =  new() {Validate = "string"},
+                ["alt"] =  new() {Default = null, Validate = "string|null"},
+                ["title"] =  new() {Default = null, Validate = "string|null"}
             },
             Group = "inline",
             Draggable = true,
@@ -118,8 +118,8 @@ public static class BasicSchema {
         // element.
         ["link"] = new() {
             Attrs = new() {
-                ["href"] = new() {},
-                ["title"] = new() {Default = null}
+                ["href"] = new() {Validate = "string"},
+                ["title"] = new() {Default = null, Validate = "string|null"}
             },
             Inclusive = false,
             // parseDOM = [new() {tag = "a[href]", getAttrs(dom = HTMLElement) new() {
@@ -156,6 +156,7 @@ public static class BasicSchema {
 
         // Code font mark. Represented as a `<code>` element.
         ["code"] = new() {
+            Code = true,
             // parseDOM = [new() {tag = "code"}],
             // toDOM() new() { return codeDOM }
         }

@@ -20,7 +20,7 @@ public static class ListSchema {
     public static OrderedDictionary<string, NodeSpec> AddListNodes(OrderedDictionary<string, NodeSpec> nodes, string itemContent, string? listGroup = null) {
         return new(nodes) {
             ["ordered_list"] = new() {
-                Attrs = new() {["order"] = new() {Default = new(1)}},
+                Attrs = new() {["order"] = new() {Default = new(1), Validate = "number"}},
                 Content = "list_item+",
                 Group = listGroup,
             },

@@ -74,8 +74,11 @@ public class StepMap : IMappable {
                 var result = start + diff + (side < 0 ? 0 : newSize);
                 if (simple) return result;
                 double? recover = pos == (assoc < 0 ? start : end) ? null : MapUtil.MakeRecover(i / 3, pos - start);
-                var del = pos == start ? Transformation.MapResult.DEL_AFTER : pos == end ? Transformation.MapResult.DEL_BEFORE : Transformation.MapResult.DEL_ACROSS;
-                if (assoc < 0 ? pos != start : pos != end) del |= Transformation.MapResult.DEL_SIDE;
+                var del = 0;
+                if (oldSize != 0) {
+                    del = pos == start ? Transformation.MapResult.DEL_AFTER : pos == end ? Transformation.MapResult.DEL_BEFORE : Transformation.MapResult.DEL_ACROSS;
+                    if (assoc < 0 ? pos != start : pos != end) del |= Transformation.MapResult.DEL_SIDE;
+                }
                 return new MapResult(result, del, recover);
             }
             diff += newSize - oldSize;

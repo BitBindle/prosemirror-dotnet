@@ -31,10 +31,10 @@ public class ReplaceStep : Step {
         new(From, From + Slice.Size, doc.Slice(From, To));
 
     public override ReplaceStep? Map(IMappable mapping) {
-        var from = mapping.MapResult(From, 1);
         var to = mapping.MapResult(To, -1);
+        var from = From == To && MapBias < 0 ? to : mapping.MapResult(From, 1);
         if (from.DeletedAcross && to.DeletedAcross) return null;
-        return new(from.Pos, Math.Max(from.Pos, to.Pos), Slice);
+        return new(from.Pos, Math.Max(from.Pos, to.Pos), Slice, Structure);
     }
 
     public override ReplaceStep? Merge(Step other) {
@@ -61,6 +61,14 @@ public class ReplaceStep : Step {
             Structure = Structure ? true : DotNext.Optional<bool?>.None
         };
     }
+
+    /// <summary>By default, for backwards compatibility, an inserting step
+    /// mapped over an insertion at that same position will move after
+    /// the inserted content. In a collaborative editing situation, that
+    /// can make redone insertions appear in unexpected places. You can
+    /// set this to -1 to make such mapping keep the step before the
+    /// insertion instead. (prosemirror-transform 1.12.0)</summary>
+    public static int MapBias { get; set; } = 1;
 
     public static ReplaceStep FromJSON(Schema schema, ReplaceStepDto json) {
         var sliceJson = json.Slice.HasValue ? json.Slice.Value : null;

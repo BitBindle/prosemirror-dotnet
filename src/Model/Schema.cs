@@ -36,11 +36,14 @@ public class Attrs : Dictionary<string, JsonNode?> {
 }
 
 public class AttributeList : Dictionary<string, Attribute> {
-    public static AttributeList InitAttrs(Dictionary<string, AttributeSpec>? specList) {
+    [Obsolete("Pass the type name, so validation errors can name it.")]
+    public static AttributeList InitAttrs(Dictionary<string, AttributeSpec>? specList) => InitAttrs("", specList);
+
+    public static AttributeList InitAttrs(string typeName, Dictionary<string, AttributeSpec>? specList) {
         var attrList = new AttributeList();
         if (specList is not null)
             foreach (var (name, spec) in specList)
-                attrList[name] = new Attribute(spec);
+                attrList[name] = new Attribute(typeName, name, spec);
         return attrList;
     }
 
@@ -50,10 +53,10 @@ public class AttributeList : Dictionary<string, Attribute> {
     /// object, and use it for all nodes that don't specify specific
     /// attributes.
     /// </summary>
-    public Attrs DefaultAttrs() {
+    public Attrs? DefaultAttrs() {
         var defaultAttrs = new Attrs();
         foreach (var (name, attr) in this) {
-            if (!attr.HasDefault) return new Attrs();
+            if (!attr.HasDefault) return null;
             defaultAttrs[name] = attr.Default;
         }
         return defaultAttrs;
@@ -62,11 +65,14 @@ public class AttributeList : Dictionary<string, Attribute> {
     public Attrs ComputeAttrs(Attrs? value) {
         var built = new Attrs();
         foreach (var (name, attr) in this) {
-            if (!value?.ContainsKey(name) ?? true) {
+            // As in JavaScript, without an attrs object each value is null: it is validated, and no default applies.
+            if (value is not null && !value.ContainsKey(name)) {
                 if (attr.HasDefault) built[name] = attr.Default;
                 else throw new Exception($"No value supplied for attribute {name}");
             } else {
-                built[name] = value![name];
+                var given = value?[name];
+                attr.Validate?.Invoke(given);
+                built[name] = given;
             }
         }
         return built;
@@ -87,7 +93,7 @@ public enum WhiteSpace {
 public class NodeType {
     public List<string> Groups { get; init; }
     public AttributeList Attrs { get; init; }
-    public Attrs DefaultAttrs { get; init; }
+    public Attrs? DefaultAttrs { get; init; }
 
     /// <summary>The name the node type has in this schema.</summary>
     public string Name { get; init; }
@@ -112,7 +118,7 @@ public class NodeType {
         Spec = spec;
 
         Groups = spec.Group?.Split(' ').ToList() ?? new();
-        Attrs = AttributeList.InitAttrs(spec.Attrs ?? new());
+        Attrs = AttributeList.InitAttrs(name, spec.Attrs ?? new());
         DefaultAttrs = Attrs.DefaultAttrs();
 
         IsBlock = !(spec.Inline ?? false || name == "text");
@@ -141,6 +147,10 @@ public class NodeType {
     /// <summary>True when this node is an atom, i.e. when it does not have
     /// directly editable content.</summary>
     public bool IsAtom => IsLeaf || (Spec.Atom ?? false);
+
+    /// <summary>Return true when this node type is part of the given
+    /// <see cref="NodeSpec.Group">group</see>.</summary>
+    public bool IsInGroup(string group) => Groups.Contains(group);
 
     private ContentMatch? _contentMatch { get; set; } = null;
     /// <summary>The starting match of the node type's content expression.</summary>
@@ -276,11 +286,31 @@ public class Attribute {
     public bool HasDefault { get; init; }
     public JsonNode? Default { get; init; }
     public bool IsRequired => !HasDefault;
+    /// <summary>Throws when a value is not valid for this attribute.</summary>
+    public Action<JsonNode?>? Validate { get; init; }
 
-    public Attribute(AttributeSpec spec) {
+    [Obsolete("Pass the type and attribute names, so validation errors can name them.")]
+    public Attribute(AttributeSpec spec) : this("", "", spec) {}
+
+    public Attribute(string typeName, string attrName, AttributeSpec spec) {
         HasDefault =  !spec.Default.IsUndefined;
         if (HasDefault && spec.Default.IsNull) Default = null;
         else if (HasDefault) Default = spec.Default.Value;
+        Validate = spec.ValidateFunction ?? (spec.Validate is null ? null : ValidateType(typeName, attrName, spec.Validate));
+    }
+
+    private static Action<JsonNode?> ValidateType(string typeName, string attrName, string type) {
+        var types = type.Split('|');
+        return value => {
+            var name = value is null ? "null" : value.GetValueKind() switch {
+                System.Text.Json.JsonValueKind.String => "string",
+                System.Text.Json.JsonValueKind.Number => "number",
+                System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False => "boolean",
+                _ => "object",
+            };
+            if (!types.Contains(name))
+                throw new Exception($"Expected value of type {string.Join(",", types)} for attribute {attrName} on type {typeName}, got {name}");
+        };
     }
 }
 
@@ -303,7 +333,7 @@ public class MarkType {
         Rank = rank;
         Schema = schema;
         Spec = spec;
-        Attrs = AttributeList.InitAttrs(spec.Attrs);
+        Attrs = AttributeList.InitAttrs(name, spec.Attrs);
         var defaults = Attrs.DefaultAttrs();
         Instance = defaults is not null ? new Mark(this, defaults) : null;
     }
@@ -464,6 +494,15 @@ public class NodeSpec {
     /// <see cref="Node.TextBetween(int, int, string?, Func{Node, String}?)"/> and
     /// <see cref="Node.TextContent"/>.</summary>
     public Func<Node, string>? LeafText { get; init; }
+
+    /// <summary>A single inline node in a schema can be set to be a linebreak
+    /// equivalent. When converting between block types that support the
+    /// node and block types that don't but have
+    /// <see cref="Whitespace"/> set to <c>"pre"</c>,
+    /// <see cref="Transformation.Transform.SetBlockType"/> will convert
+    /// between newline characters to or from linebreak nodes as
+    /// appropriate.</summary>
+    public bool? LinebreakReplacement { get; init; }
 }
 
 /// <summary>Used to define marks when creating a schema.</summary>
@@ -497,6 +536,10 @@ public class MarkSpec {
     /// <summary>Determines whether marks of this type can span multiple adjacent
     /// nodes when serialized to DOM/HTML. Defaults to true.</summary>
     public bool? Spanning { get; init; }
+
+    /// <summary>Marks the content of this span as being code, which causes some
+    /// commands and extensions to treat it differently.</summary>
+    public bool? Code { get; init; }
 }
 
 /// <summary>Used to <see cref="NodeSpec.Attrs">define</see> attributes on nodes or
@@ -509,6 +552,17 @@ public class AttributeSpec {
     [JsonConverter(typeof(OptionalConverterFactory))]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public Optional<JsonNode> Default { get; init; }
+
+    /// <summary>A <c>|</c>-separated list of primitive types (<c>"number"</c>, <c>"string"</c>,
+    /// <c>"boolean"</c>, <c>"null"</c> or <c>"object"</c>) that values of this attribute must
+    /// have. Checked when a node or mark is created with a value for the attribute,
+    /// and by <see cref="Node.Check"/>.</summary>
+    public string? Validate { get; init; }
+
+    /// <summary>A function that throws when a value is not valid. Used instead of
+    /// <see cref="Validate"/> when given.</summary>
+    [JsonIgnore]
+    public Action<JsonNode?>? ValidateFunction { get; init; }
 }
 
 /// <summary>A document schema. Holds <see cref="NodeType">node</see> and
@@ -529,6 +583,10 @@ public class Schema {
 
     /// <summary>A map from mark names to mark type objects.</summary>
     public Dictionary<string, MarkType> Marks { get; init; }
+
+    /// <summary>The <see cref="NodeSpec.LinebreakReplacement">linebreak replacement</see> node
+    /// defined in this schema, if any.</summary>
+    public NodeType? LinebreakReplacement { get; private set; }
 
     public class ActiveSchemaSpec : ISchemaSpec {
         public required OrderedDictionary<string, NodeSpec> Nodes { get; init; }
@@ -561,6 +619,11 @@ public class Schema {
                 contentExprCache[contentExpr] = type.ContentMatch;
             }
             type.InlineContent = type.ContentMatch.InlineContent;
+            if (type.Spec.LinebreakReplacement ?? false) {
+                if (LinebreakReplacement is not null) throw new Exception("Multiple linebreak nodes defined");
+                if (!type.IsInline || !type.IsLeaf) throw new Exception("Linebreak replacement nodes must be inline leaf nodes");
+                LinebreakReplacement = type;
+            }
             type.MarkSet = markExpr == "_" ? null :
                 markExpr?.Length > 0 ? GatherMarks(markExpr.Split(" ").ToList()) :
                 markExpr == string.Empty || !type.InlineContent ? new() : null;
@@ -601,7 +664,7 @@ public class Schema {
     /// allowed.</summary>
     public TextNode Text(string text, List<Mark>? marks = null) {
         var type = Nodes["text"];
-        return new TextNode(type, type.DefaultAttrs, text, Model.Mark.SetFrom(marks!));
+        return new TextNode(type, type.DefaultAttrs!, text, Model.Mark.SetFrom(marks!));
     }
 
     /// <summary>Create a mark with the given type and attributes.</summary>

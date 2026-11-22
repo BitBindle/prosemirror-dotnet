@@ -17,6 +17,8 @@ public class Node {
     public NodeType Type { get; init; }
     public Attrs Attrs { get; init; }
     public Fragment Content { get; init; } = new(new(), 0);
+    /// <summary>The list of this node's child nodes.</summary>
+    public List<Node> Children => Content.Content;
     public List<Mark> Marks { get; init; } = Model.Mark.None;
 
     public virtual string? Text { get; }
@@ -207,11 +209,23 @@ public class Node {
 
     public void Check() {
         Type.CheckContent(Content);
+        CheckAttrs(Type.Attrs, Attrs, "node", Type.Name);
         var copy = Model.Mark.None;
-        for (var i = 0; i < Marks.Count; i++) copy = Marks[i].AddToSet(copy);
+        for (var i = 0; i < Marks.Count; i++) {
+            var mark = Marks[i];
+            CheckAttrs(mark.Type.Attrs, mark.Attrs, "mark", mark.Type.Name);
+            copy = mark.AddToSet(copy);
+        }
         if (!Model.Mark.SameSet(copy, Marks))
             throw new Exception($"Invalid collection of marks for node {Type.Name}: {Marks.Select(m => m.Type.Name)}");
         Content.ForEach((node,_,_) => node.Check());
+    }
+
+    private static void CheckAttrs(AttributeList attrs, Attrs values, string type, string name) {
+        foreach (var (attr, _) in values)
+            if (!attrs.ContainsKey(attr)) throw new Exception($"Unsupported attribute {attr} for {type} of type {name}");
+        foreach (var (attr, spec) in attrs)
+            spec.Validate?.Invoke(values.GetValueOrDefault(attr));
     }
 
     public virtual NodeDto ToJSON() {

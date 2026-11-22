@@ -223,7 +223,7 @@ public record Expression {
 
         var result = new List<NodeType>();
         foreach (var (typeName, _type) in types) {
-            if (_type.Groups.Contains(name)) result.Add(_type);
+            if (_type.IsInGroup(name)) result.Add(_type);
         }
         if (result.Count == 0) stream.Err($"No node type or group '{name}' found");
         return result;
