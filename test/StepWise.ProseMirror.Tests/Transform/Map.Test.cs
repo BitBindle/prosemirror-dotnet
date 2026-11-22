@@ -2,7 +2,6 @@ using System.Text.Json;
 
 using OneOf;
 using Xunit;
-using Xunit.Abstractions;
 
 
 namespace StepWise.Prose.Transformation.Test;

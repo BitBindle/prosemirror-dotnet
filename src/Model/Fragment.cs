@@ -9,8 +9,11 @@ using StepWise.Prose.Collections;
 namespace StepWise.Prose.Model;
 
 
-internal static class ContentLikeBuilder {
-	internal static ContentLike Create(ReadOnlySpan<Node> nodes) => new ContentLike { Content = nodes.ToArray().ToList() };
+/// <summary>Backs collection expressions (<c>[node1, node2]</c>) for <see cref="ContentLike"/>.
+/// It has to be public so that code outside this assembly can use them.</summary>
+[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+public static class ContentLikeBuilder {
+    public static ContentLike Create(ReadOnlySpan<Node> nodes) => new ContentLike { Content = nodes.ToArray().ToList() };
 }
 
 [CollectionBuilder(typeof(ContentLikeBuilder), "Create")]

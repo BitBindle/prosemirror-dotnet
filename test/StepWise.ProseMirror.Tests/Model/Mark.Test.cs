@@ -1,5 +1,4 @@
 using Xunit;
-using Xunit.Abstractions;
 
 using StepWise.Prose.TestBuilder;
 using StepWise.Prose.SchemaBasic;
