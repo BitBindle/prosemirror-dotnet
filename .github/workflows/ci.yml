@@ -25,10 +25,10 @@ jobs:
           cache: false
 
       - name: Restore
-        run: dotnet restore prosemirror-dotnet.sln
+        run: dotnet restore prosemirror-dotnet.slnx
 
       - name: Build
-        run: dotnet build prosemirror-dotnet.sln --no-restore --configuration Debug
+        run: dotnet build prosemirror-dotnet.slnx --no-restore --configuration Debug
 
       - name: Test
-        run: dotnet test --solution prosemirror-dotnet.sln --no-build --configuration Debug
+        run: dotnet test --solution prosemirror-dotnet.slnx --no-build --configuration Debug

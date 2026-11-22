@@ -47,10 +47,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Restore
-        run: dotnet restore prosemirror-dotnet.sln
+        run: dotnet restore prosemirror-dotnet.slnx
 
       - name: Test
-        run: dotnet test --solution prosemirror-dotnet.sln --no-restore --configuration Debug
+        run: dotnet test --solution prosemirror-dotnet.slnx --no-restore --configuration Debug
 
       - name: Pack
         run: >
