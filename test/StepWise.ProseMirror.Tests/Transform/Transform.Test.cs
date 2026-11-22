@@ -1,6 +1,5 @@
 using System.Text.Json.Nodes;
 
-using OneOf;
 using Xunit;
 
 using StepWise.Prose.Model;
@@ -225,17 +224,14 @@ public class TransformTest {
        join(doc(p("foo"),"<a>",p("bar")),
            doc(p("foo<a>bar")));
 
-    private static void split(Node doc, OneOf<string, Node> expect, int? depth = null,
+    /// <summary><paramref name="expect"/> is the expected document, or a string when the split should fail.</summary>
+    private static void split(Node doc, object expect, int? depth = null,
                               List<Wrapper?>? typesAfter = null)
     {
-        expect.Switch(
-            str => {
-                istThrows(() => new Transform(doc).Split(tag(doc, "a"), depth, typesAfter));
-            },
-            node => {
-                Util.testTransform(new Transform(doc).Split(tag(doc, "a"), depth, typesAfter), node);
-            }
-        );
+        if (expect is Node node)
+            Util.testTransform(new Transform(doc).Split(tag(doc, "a"), depth, typesAfter), node);
+        else
+            istThrows(() => new Transform(doc).Split(tag(doc, "a"), depth, typesAfter));
     }
 
    [Fact] public void Can_Split_A_Textblock() =>
@@ -954,7 +950,7 @@ public class TransformTest {
    [Fact] public void Replaces_A_Mark() =>
       addNodeMark(doc(p("<a>",a(img()))),schema.Mark("link",new() {["href"] = "x"}),doc(p("<a>",a(new {href = "x"},img()))));
 
-    private static void rmNodeMark(Node doc, OneOf<Model.Mark, MarkType> mark, Node expect) =>
+    private static void rmNodeMark(Node doc, Model.Mark mark, Node expect) =>
         Util.testTransform(new Transform(doc).RemoveNodeMark(tag(doc, "a"), mark), expect);
 
    [Fact] public void Removes_A_Mark() =>

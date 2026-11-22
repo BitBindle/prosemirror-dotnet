@@ -2,7 +2,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-using OneOf;
 
 
 
@@ -682,18 +681,21 @@ public class Schema {
     /// <c>content</c> may be a <c>Fragment</c>, <c>null</c>, a <c>Node</c>, or an array of
     /// nodes.</summary>
     public Node Node(
-        OneOf<string, NodeType> type,
+        string type,
+        Attrs? attrs = null,
+        ContentLike? content = null,
+        List<Mark>? marks = null) => Node(NodeType(type), attrs, content, marks);
+
+    /// <inheritdoc cref="Node(string, Attrs?, ContentLike?, List{Mark}?)"/>
+    public Node Node(
+        NodeType type,
         Attrs? attrs = null,
         ContentLike? content = null,
         List<Mark>? marks = null)
     {
-        var _type = type.Match(
-            str => NodeType(str),
-            nodeType => nodeType
-        );
-        if (!ReferenceEquals(_type.Schema, this)) throw new Exception($"Node type from different schema used ({_type.Name})");
+        if (!ReferenceEquals(type.Schema, this)) throw new Exception($"Node type from different schema used ({type.Name})");
 
-        return _type.CreateChecked(attrs, content, marks);
+        return type.CreateChecked(attrs, content, marks);
     }
 
     /// <summary>Create a text node in the schema. Empty text nodes are not
@@ -704,13 +706,10 @@ public class Schema {
     }
 
     /// <summary>Create a mark with the given type and attributes.</summary>
-    public Mark Mark(OneOf<string, MarkType> type, Attrs? attrs = null) {
-        var _type = type.Match(
-            str => Marks[str],
-            markType => markType
-        );
-        return _type.Create(attrs);
-    }
+    public Mark Mark(string type, Attrs? attrs = null) => Marks[type].Create(attrs);
+
+    /// <inheritdoc cref="Mark(string, Attrs?)"/>
+    public Mark Mark(MarkType type, Attrs? attrs = null) => type.Create(attrs);
 
     /// <summary>Deserialize a node from its JSON representation.</summary>
     public Node NodeFromJSON(NodeDto json) {

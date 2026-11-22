@@ -1,13 +1,16 @@
 using System.Runtime.CompilerServices;
 
-using OneOf;
-
 
 namespace StepWise.Prose.Model;
 
-using PathList = List<OneOf<Node, int>>;
+using PathList = List<ResolvedPos.PathEntry>;
 
 public class ResolvedPos {
+    /// <summary>One level of a resolved position: the node at that depth, the index
+    /// into it, and the document position of the child at that index (or of the
+    /// position itself, at the deepest level).</summary>
+    public readonly record struct PathEntry(Node Node, int Index, int Offset);
+
     // One cache per document, as the WeakMap in prosemirror-model. A document can be read from several threads.
     static readonly ConditionalWeakTable<Node, DocResolveCache> Caches = new();
 
@@ -28,8 +31,7 @@ public class ResolvedPos {
         Pos = pos;
         Path = path;
         ParentOffset = parentOffset;
-        Depth =
-        path.Count / 3 - 1;
+        Depth = path.Count - 1;
     }
 
     public int ResolveDepth(int? val) {
@@ -42,9 +44,9 @@ public class ResolvedPos {
 
     public Node Doc => Node(0);
 
-    public Node Node(int? depth) => (Node)Path[ResolveDepth(depth) * 3].Value;
+    public Node Node(int? depth) => Path[ResolveDepth(depth)].Node;
 
-    public int Index(int? depth = null) => (int)Path[ResolveDepth(depth) * 3 + 1].Value;
+    public int Index(int? depth = null) => Path[ResolveDepth(depth)].Index;
 
     public int IndexAfter(int? depth) {
         var _depth = ResolveDepth(depth);
@@ -53,7 +55,7 @@ public class ResolvedPos {
 
     public int Start(int? depth = null) {
         var _depth = ResolveDepth(depth);
-        return _depth == 0 ? 0 : (int)Path[_depth * 3 - 1].Value + 1;
+        return _depth == 0 ? 0 : Path[_depth - 1].Offset + 1;
     }
 
     public int End(int? depth = null) {
@@ -68,7 +70,7 @@ public class ResolvedPos {
         } catch (ArgumentOutOfRangeException e) {
             throw new Exception("There is no position before the top-level node", e);
         }
-        return _depth == Depth + 1 ? Pos : (int)Path[_depth * 3 - 1].Value;
+        return _depth == Depth + 1 ? Pos : Path[_depth - 1].Offset;
     }
 
     public int After(int? depth) {
@@ -78,23 +80,23 @@ public class ResolvedPos {
         } catch (ArgumentOutOfRangeException e) {
             throw new Exception("There is no position after the top-level node", e);
         }
-        return _depth == Depth + 1 ? Pos : (int)Path[_depth * 3 - 1].Value + Node(depth).NodeSize;
+        return _depth == Depth + 1 ? Pos : Path[_depth - 1].Offset + Node(depth).NodeSize;
     }
 
-    public int TextOffset => Pos - (int)Path[^1].Value;
+    public int TextOffset => Pos - Path[^1].Offset;
 
     public Node? NodeAfter { get {
         var parent = Parent;
         var index = Index(Depth);
         if (index == parent.ChildCount) return null;
-        var dOff = Pos - (int)Path[^1].Value;
+        var dOff = Pos - Path[^1].Offset;
         var child = parent.Child(index);
         return dOff > 0 ? parent.Child(index).Cut(dOff) : child;
     }}
 
     public Node? NodeBefore { get {
         var index = Index(Depth);
-        var dOff = Pos - (int)Path[^1].Value;
+        var dOff = Pos - Path[^1].Offset;
         if (dOff > 0) return Parent.Child(index).Cut(0, dOff);
         return index == 0 ? null : Parent.Child(index - 1);
     }}
@@ -102,7 +104,7 @@ public class ResolvedPos {
     public int PosAtIndex(int index, int? depth = null) {
         var _depth = ResolveDepth(depth);
         var node = Node(depth);
-        var pos = _depth == 0 ? 0 : (int)Path[_depth * 3 - 1].Value + 1;
+        var pos = _depth == 0 ? 0 : Path[_depth - 1].Offset + 1;
         for (var i = 0; i < index; i++) pos += node.Child(i).NodeSize;
         return pos;
     }
@@ -182,7 +184,7 @@ public class ResolvedPos {
         for (var node = doc;;) {
             var (index, offset) = node.Content.FindIndex(parentOffset);
             var rem = parentOffset - offset;
-            path.Add(node); path.Add(index); path.Add(start + offset);
+            path.Add(new(node, index, start + offset));
             if (rem <= 0) break;
             node = node.Child(index);
             if (node.IsText) break;

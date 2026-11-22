@@ -2,7 +2,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-using OneOf;
 
 using StepWise.Prose.Collections;
 using StepWise.Prose.Text.Json;
@@ -141,15 +140,18 @@ public class Node {
 
     public ResolvedPos ResolveNoCache(int pos) => ResolvedPos.Resolve(this, pos);
 
-    public bool RangeHasMark(int from, int to, OneOf<Mark, MarkType> type) {
+    /// <summary>Test whether a given mark is present in the given range.</summary>
+    public bool RangeHasMark(int from, int to, Mark mark) =>
+        RangeHasMark(from, to, marks => mark.IsInSet(marks));
+
+    /// <summary>Test whether a mark of the given type is present in the given range.</summary>
+    public bool RangeHasMark(int from, int to, MarkType type) =>
+        RangeHasMark(from, to, marks => type.IsInSet(marks) is not null);
+
+    private bool RangeHasMark(int from, int to, Func<List<Mark>, bool> isInSet) {
         var found = false;
         if (to > from) NodesBetween(from, to, (node, _, _, _) => {
-            var isInSet = false;
-            type.Switch(
-                mark => isInSet = mark.IsInSet(node.Marks),
-                markType => isInSet = markType.IsInSet(node.Marks) is not null
-            );
-            if (isInSet) found = true;
+            if (isInSet(node.Marks)) found = true;
             return !found;
         });
         return found;

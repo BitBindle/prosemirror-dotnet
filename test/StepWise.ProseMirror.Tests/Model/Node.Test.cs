@@ -207,3 +207,28 @@ public class NodeTest {
       ist(paragraph.TextContent,"Hello Bob <bob@example.com>");
     }
 }
+
+public class RangeHasMarkTest {
+    private static readonly Node testDoc = doc(p("ab", em("cd"), a("ef"), "gh"));
+
+    [Fact] public void Finds_A_Mark_By_Instance() {
+        Assert.True(testDoc.RangeHasMark(1, 9, schema.Mark("em")));
+        Assert.True(testDoc.RangeHasMark(4, 5, schema.Mark("em")));
+        Assert.False(testDoc.RangeHasMark(1, 3, schema.Mark("em")));
+        Assert.False(testDoc.RangeHasMark(7, 9, schema.Mark("em")));
+    }
+
+    [Fact] public void Finds_A_Mark_By_Type() {
+        Assert.True(testDoc.RangeHasMark(1, 9, schema.Marks["link"]));
+        Assert.False(testDoc.RangeHasMark(1, 5, schema.Marks["link"]));
+    }
+
+    [Fact] public void Compares_Mark_Attributes_But_Not_For_Types() {
+        Assert.True(testDoc.RangeHasMark(5, 7, schema.Mark("link", new() { ["href"] = "foo" })));
+        Assert.False(testDoc.RangeHasMark(5, 7, schema.Mark("link", new() { ["href"] = "bar" })));
+        Assert.True(testDoc.RangeHasMark(5, 7, schema.Marks["link"]));
+    }
+
+    [Fact] public void Is_False_For_An_Empty_Range() =>
+        Assert.False(testDoc.RangeHasMark(4, 4, schema.Marks["em"]));
+}

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using OneOf;
 using StepWise.Prose.Collections;
 
 
@@ -57,13 +56,17 @@ public class StepMap : IMappable {
         return Ranges[index * 3] + diff + MapUtil.RecoverOffset(value);
     }
 
-    public MapResult MapResult(int pos, int assoc = 1) =>
-        (MapResult)_map(pos, assoc, false).Value;
+    public MapResult MapResult(int pos, int assoc = 1) {
+        _map(pos, assoc, false, out var result);
+        return result!;
+    }
 
-    public int Map(int pos, int assoc = 1) =>
-        (int)_map(pos, assoc, true).Value;
+    public int Map(int pos, int assoc = 1) => _map(pos, assoc, true, out _);
 
-    public OneOf<int, MapResult> _map(int pos, int assoc, bool simple) {
+    /// <summary>Maps a position. Builds a <see cref="Transformation.MapResult"/> in
+    /// <paramref name="result"/> only when <paramref name="simple"/> is false.</summary>
+    private int _map(int pos, int assoc, bool simple, out MapResult? result) {
+        result = null;
         int diff = 0, oldIndex = Inverted ? 2 : 1, newIndex = Inverted ? 1 : 2;
         for (var i = 0; i < Ranges.Count; i += 3) {
             var start = Ranges[i] - (Inverted ? diff : 0);
@@ -71,19 +74,21 @@ public class StepMap : IMappable {
             int oldSize = Ranges[i + oldIndex], newSize = Ranges[i + newIndex], end = start + oldSize;
             if (pos <= end) {
                 int side = oldSize == 0 ? assoc : pos == start ? -1 : pos == end ? 1 : assoc;
-                var result = start + diff + (side < 0 ? 0 : newSize);
-                if (simple) return result;
+                var mapped = start + diff + (side < 0 ? 0 : newSize);
+                if (simple) return mapped;
                 double? recover = pos == (assoc < 0 ? start : end) ? null : MapUtil.MakeRecover(i / 3, pos - start);
                 var del = 0;
                 if (oldSize != 0) {
                     del = pos == start ? Transformation.MapResult.DEL_AFTER : pos == end ? Transformation.MapResult.DEL_BEFORE : Transformation.MapResult.DEL_ACROSS;
                     if (assoc < 0 ? pos != start : pos != end) del |= Transformation.MapResult.DEL_SIDE;
                 }
-                return new MapResult(result, del, recover);
+                result = new MapResult(mapped, del, recover);
+                return mapped;
             }
             diff += newSize - oldSize;
         }
-        return simple ? pos + diff : new MapResult(pos + diff, 0, null);
+        if (!simple) result = new MapResult(pos + diff, 0, null);
+        return pos + diff;
     }
 
     public bool Touches(int pos, double recover) {
@@ -177,17 +182,19 @@ public class Mapping : IMappable {
     }
 
     public int Map(int pos, int assoc = 1) {
-        if (Mirror is not null) return (int)_map(pos, assoc, true).Value;
+        if (Mirror is not null) return _map(pos, assoc, true, out _);
         for (var i = From; i < To; i++)
             pos = Maps[i].Map(pos, assoc);
         return pos;
     }
 
-    public MapResult MapResult(int pos, int assoc = 1) =>
-        (MapResult)_map(pos, assoc, false).Value;
+    public MapResult MapResult(int pos, int assoc = 1) {
+        _map(pos, assoc, false, out var result);
+        return result!;
+    }
 
-
-    public OneOf<int, MapResult> _map(int pos, int assoc, bool simple) {
+    private int _map(int pos, int assoc, bool simple, out MapResult? mapResult) {
+        mapResult = null;
         var delInfo = 0;
 
         for (var i = From; i < To; i++) {
@@ -206,7 +213,8 @@ public class Mapping : IMappable {
             pos = result.Pos;
         }
 
-        return simple ? pos : new MapResult(pos, delInfo, null);
+        if (!simple) mapResult = new MapResult(pos, delInfo, null);
+        return pos;
     }
 
 }

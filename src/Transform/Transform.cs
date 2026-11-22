@@ -1,7 +1,5 @@
 using System.Text.Json.Nodes;
 
-using OneOf;
-
 using StepWise.Prose.Model;
 
 
@@ -151,24 +149,24 @@ public class Transform {
         return this;
     }
 
-    /// <summary>Remove a mark (or all marks of the given type) from the node at
-    /// position <c>pos</c>.</summary>
-    public Transform RemoveNodeMark(int pos, OneOf<Model.Mark, MarkType> mark) {
-        var node = Doc.NodeAt(pos);
-        if (node is null) throw new Exception($"No node at position {pos}");
-        if (mark.Value is Model.Mark _mark) {
-            if (_mark.IsInSet(node.Marks)) Step(new RemoveNodeMarkStep(pos, _mark));
-        } else {
-            var markType = (MarkType)mark.Value;
-            var set = node.Marks;
-            var steps = new List<Step>();
-            Model.Mark? found;
-            while ((found = markType.IsInSet(set)) is not null) {
-                steps.Add(new RemoveNodeMarkStep(pos, found));
-                set = found.RemoveFromSet(set);
-            }
-            for (var i = steps.Count - 1; i >= 0; i--) Step(steps[i]);
+    /// <summary>Remove a mark from the node at position <c>pos</c>.</summary>
+    public Transform RemoveNodeMark(int pos, Model.Mark mark) {
+        var node = Doc.NodeAt(pos) ?? throw new Exception($"No node at position {pos}");
+        if (mark.IsInSet(node.Marks)) Step(new RemoveNodeMarkStep(pos, mark));
+        return this;
+    }
+
+    /// <summary>Remove all marks of the given type from the node at position <c>pos</c>.</summary>
+    public Transform RemoveNodeMark(int pos, MarkType markType) {
+        var node = Doc.NodeAt(pos) ?? throw new Exception($"No node at position {pos}");
+        var set = node.Marks;
+        var steps = new List<Step>();
+        Model.Mark? found;
+        while ((found = markType.IsInSet(set)) is not null) {
+            steps.Add(new RemoveNodeMarkStep(pos, found));
+            set = found.RemoveFromSet(set);
         }
+        for (var i = steps.Count - 1; i >= 0; i--) Step(steps[i]);
         return this;
     }
 

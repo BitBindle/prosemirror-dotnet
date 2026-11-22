@@ -1,6 +1,5 @@
 using System.Text.Json;
 
-using OneOf;
 using Xunit;
 
 
@@ -8,15 +7,18 @@ namespace StepWise.Prose.Transformation.Test;
 
 using Transformation;
 
-using MappingCase = OneOf<
-    (int from, int to),
-    (int from, int to, int bias),
-    (int from, int to, int bias, bool lossy)
->;
 
 # pragma warning disable CS8981
 using d = Dictionary<int, int>;
 
+
+/// <summary>A position that should map to <c>To</c> with the given bias, and back again
+/// through the inverted mapping unless <c>Lossy</c>.</summary>
+public readonly record struct MappingCase(int From, int To, int Bias = 1, bool Lossy = false) {
+    public static implicit operator MappingCase((int from, int to) c) => new(c.from, c.to);
+    public static implicit operator MappingCase((int from, int to, int bias) c) => new(c.from, c.to, c.bias);
+    public static implicit operator MappingCase((int from, int to, int bias, bool lossy) c) => new(c.from, c.to, c.bias, c.lossy);
+}
 
 public class MappingTest {
 
@@ -33,25 +35,9 @@ public class MappingTest {
 
     private void testMapping(Mapping mapping, params MappingCase[] cases) {
         var inverted = mapping.Invert();
-        for (var i = 0; i < cases.Length; i++) {
-            var tCase = cases[i];
-            tCase.Switch(
-                a => {
-                    var (from, to) = a;
-                    Assert.Equal(to, mapping.Map(from, 1));
-                    Assert.Equal(from, inverted.Map(to, 1));
-                },
-                b => {
-                    var (from, to, bias) = b;
-                    Assert.Equal(to, mapping.Map(from, bias));
-                    Assert.Equal(from, inverted.Map(to, bias));
-                },
-                c => {
-                    var (from, to, bias, lossy) = c;
-                    Assert.Equal(to, mapping.Map(from, bias));
-                    if (!lossy) Assert.Equal(from, inverted.Map(to, bias));
-                }
-            );
+        foreach (var (from, to, bias, lossy) in cases) {
+            Assert.Equal(to, mapping.Map(from, bias));
+            if (!lossy) Assert.Equal(from, inverted.Map(to, bias));
         }
     }
 
@@ -65,15 +51,21 @@ public class MappingTest {
         Assert.Equal(flags, found);
     }
 
-    public Mapping mk(params OneOf<(int, int, int), Dictionary<int, int>>[] args) {
+    /// <summary>Builds a mapping from <c>(start, oldSize, newSize)</c> step maps and
+    /// dictionaries of mirrored map indices.</summary>
+    public Mapping mk(params object[] args) {
         var mapping = new Mapping();
         foreach (var arg in args) {
-            arg.Switch(
-                t => mapping.AppendMap(new StepMap(new() {t.Item1, t.Item2, t.Item3})),
-                dict => {
-                    foreach (var (from, to) in dict) mapping.SetMirror(+from, to);
-                }
-            );
+            switch (arg) {
+                case ValueTuple<int, int, int> t:
+                    mapping.AppendMap(new StepMap(new() {t.Item1, t.Item2, t.Item3}));
+                    break;
+                case Dictionary<int, int> dict:
+                    foreach (var (from, to) in dict) mapping.SetMirror(from, to);
+                    break;
+                default:
+                    throw new ArgumentException($"Unsupported mapping argument {arg}");
+            }
         }
         return mapping;
     }
