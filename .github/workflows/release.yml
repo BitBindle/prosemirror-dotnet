@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 concurrency:
   group: release
@@ -58,6 +59,7 @@ jobs:
           --configuration Release
           --output artifacts
           -p:Version=${{ steps.version.outputs.version }}
+          -p:RepositoryUrl=${{ github.server_url }}/${{ github.repository }}.git
           -p:RepositoryCommit=${{ github.sha }}
           -p:RepositoryBranch=${{ github.ref_name }}
 
@@ -70,6 +72,15 @@ jobs:
           --title "v${{ steps.version.outputs.version }}"
           --generate-notes
           artifacts/*.nupkg
+
+      # GitHub Packages links the package to the repository named by RepositoryUrl, which must be
+      # this repository for GITHUB_TOKEN to be allowed to publish it.
+      - name: Push to GitHub Packages
+        run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          --api-key "${{ github.token }}"
+          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          --skip-duplicate
 
       - name: Push to NuGet
         if: ${{ env.NUGET_API_KEY != '' }}

@@ -1,32 +1,59 @@
 ProseMirror.Net
 ===============
 
-> [!NOTE]
-> This project is *not* dead! ProseMirror's core packages see very little change due to maturity; including bug fixes. ProseMirror.Net
-> powers the collaborative editing backend at [StepWiseHQ](https://stepwisehq.com).
+A direct translation of the core ProseMirror packages from TypeScript to C#. Use it to work with ProseMirror
+documents in .NET:
 
-*The* best way to work with ProseMirror document models in DotNet:
-
-- Document and step DTOs for serialization/deserialization
+- Document and step DTOs for JSON serialization and deserialization
 - Building and updating documents server-side
 - Server-side schema validation
 - Building collaborative editing backends
 
+Translated packages:
 
+- `prosemirror-model`
+- `prosemirror-transform`
+- `prosemirror-test-builder`
+- `prosemirror-schema-basic`
+- `prosemirror-schema-list`
 
-ProseMirror.Net is a direct translation of the core ProseMirror packages from TypeScript to C#
+It also includes a commit-based collab authority, a faster take on `prosemirror-collab`; see
+[src/Collab/README.md](src/Collab/README.md).
 
-- [x] `prosemirror-model`
-- [x] `prosemirror-transform`
-- [x] `prosemirror-test-builder`
-- [x] `prosemirror-schema-basic`
-- [x] `prosemirror-schema-list`
+This repository is a fork of [stepwisehq/prosemirror-dotnet](https://github.com/stepwisehq/prosemirror-dotnet).
 
 
 ## Getting Started
 
+The package is published to this fork's GitHub Packages feed. GitHub Packages needs you to sign in, even to read
+public packages, so first create a [personal access token (classic)](https://github.com/settings/tokens) with the
+`read:packages` scope. Then add the feed and install the package:
+
 ```bash
-dotnet add package StepWise.ProseMirror
+dotnet nuget add source https://nuget.pkg.github.com/BitBindle/index.json --name bitbindle --username <github-username> --password <token> --store-password-in-clear-text
+```
+
+```bash
+dotnet add package StepWise.ProseMirror --source bitbindle
+```
+
+For CI, or to keep the token out of your user config, put the feed in a `nuget.config` next to your solution and
+read the credentials from environment variables. In GitHub Actions, `GITHUB_ACTOR` and `GITHUB_TOKEN` work as is,
+as long as the workflow has `packages: read` permission:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="bitbindle" value="https://nuget.pkg.github.com/BitBindle/index.json" />
+  </packageSources>
+  <packageSourceCredentials>
+    <bitbindle>
+      <add key="Username" value="%GITHUB_ACTOR%" />
+      <add key="ClearTextPassword" value="%GITHUB_TOKEN%" />
+    </bitbindle>
+  </packageSourceCredentials>
+</configuration>
 ```
 
 ### Basic Usage
@@ -35,25 +62,24 @@ dotnet add package StepWise.ProseMirror
 using StepWise.Prose.Model;
 
 var schemaSpec = new SchemaSpec() {
-	Nodes = new()
-	{
-		["doc"] = new() { Content = "paragraph+" },
-		["paragraph"] = new() { Content = "text*" },
-		["text"] = new() { }
-	},
+    Nodes = new()
+    {
+        ["doc"] = new() { Content = "paragraph+" },
+        ["paragraph"] = new() { Content = "text*" },
+        ["text"] = new() { }
+    },
     Marks = new()
 };
 var schema = new Schema(schemaSpec);
 
 var doc = schema.Node("doc", null, [
-	schema.Node("paragraph", null, [
-		schema.Text("Hello World")
-	], null)
+    schema.Node("paragraph", null, [
+        schema.Text("Hello World")
+    ], null)
 ], null);
 
 Console.WriteLine(doc.ToString()); // doc(paragraph("Hello World"))
 ```
-
 
 ### Test Builder & Transform
 
@@ -93,7 +119,8 @@ tr.Step(step);
 Console.WriteLine(tr.Doc.ToString()); // doc(paragraph("Hello World"))
 ```
 
-### Deserializing Docs(Nodes)
+### Deserializing Docs (Nodes)
+
 ```csharp
 using StepWise.Prose.Model;
 using StepWise.Prose.TestBuilder;
