@@ -24,13 +24,20 @@ public class ContentLike : IEnumerable<Node> {
     public static implicit operator ContentLike(Node node) => new() { Content = node };
     public static implicit operator ContentLike(Fragment fragment) => new() { Content = fragment };
 
-    public IEnumerator<Node> GetEnumerator() => (IEnumerator<Node>)(IEnumerable)this.GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() {
-        if (Content is Node[] stuff)
-            return stuff.GetEnumerator();
-        else
-            throw new Exception("This content is not a node list!");
+    /// <summary>Enumerates the nodes this content holds, as given: the single node, the
+    /// list's nodes, or the fragment's children.</summary>
+    public IEnumerator<Node> GetEnumerator() {
+        IEnumerable<Node> nodes = Content switch {
+            Node node => [node],
+            IEnumerable<Node> list => list,
+            Fragment fragment => fragment.Content,
+            null => [],
+            _ => throw new Exception($"Can't enumerate content of type {Content.GetType().Name}"),
+        };
+        return nodes.GetEnumerator();
     }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 public class Fragment {
