@@ -150,7 +150,7 @@ public class AddNodeMarkStep : Step {
 
     public override AddNodeMarkStep? Map(IMappable mapping) {
         var pos = mapping.MapResult(Pos, 1);
-        return pos.DeletedAfter ? null : new AddNodeMarkStep(Pos, Mark);
+        return pos.DeletedAfter ? null : new AddNodeMarkStep(pos.Pos, Mark);
     }
 
     public override AddNodeMarkStepDto ToJSON() =>
@@ -187,7 +187,7 @@ public class RemoveNodeMarkStep : Step {
 
     public override RemoveNodeMarkStep? Map(IMappable mapping) {
         var pos = mapping.MapResult(Pos, 1);
-        return pos.DeletedAfter ? null : new RemoveNodeMarkStep(Pos, Mark);
+        return pos.DeletedAfter ? null : new RemoveNodeMarkStep(pos.Pos, Mark);
     }
 
     public override RemoveNodeMarkStepDto ToJSON() =>

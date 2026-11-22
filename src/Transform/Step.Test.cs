@@ -18,6 +18,22 @@ public class StepTest {
 
     private static Node testDoc = doc(p("foobar"));
 
+    [Fact] public void Node_Mark_Steps_Map_Their_Position() {
+        var start = doc(p("a", img()));
+        var insert = new ReplaceStep(1, 1, new Slice(Fragment.From(schema.Text("xy")), 0, 0));
+        var after = insert.Apply(start).Doc!;
+        var mark = schema.Marks["em"].Create();
+
+        var add = (AddNodeMarkStep)new AddNodeMarkStep(2, mark).Map(insert.GetMap())!;
+        Assert.Equal(4, add.Pos);
+        var marked = add.Apply(after).Doc!;
+        ist(marked, doc(p("xya", em(img()))), eq);
+
+        var remove = (RemoveNodeMarkStep)new RemoveNodeMarkStep(2, mark).Map(insert.GetMap())!;
+        Assert.Equal(4, remove.Pos);
+        ist(remove.Apply(marked).Doc!, after, eq);
+    }
+
     private static Step mkStep(int from, int to, string? val) {
         if (val == "+em")
             return new AddMarkStep(from, to, schema.Marks["em"].Create());
