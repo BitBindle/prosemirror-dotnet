@@ -1,15 +1,13 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-using DotNext;
-using DotNext.Text.Json;
-using Json.More;
-using OneOf;
 
-using StepWise.Prose.Collections;
 
 
 namespace StepWise.Prose.Model;
+
+using StepWise.Prose.Collections;
 
 /// <summary>
 /// An object holding the attributes of a node.
@@ -27,7 +25,7 @@ public class Attrs : Dictionary<string, JsonNode?> {
         // Do basic reference equality check.
         if (a.Select(kv => kv.Key).All(k => ReferenceEquals(a[k], b[k]))) return true;
         // Do deep equality check.
-        if (a.Select(kv => kv.Key).All(k => a[k].IsEquivalentTo(b[k]))) {
+        if (a.Select(kv => kv.Key).All(k => JsonNode.DeepEquals(a[k], b[k]))) {
             return true;
         }
 
@@ -293,9 +291,8 @@ public class Attribute {
     public Attribute(AttributeSpec spec) : this("", "", spec) {}
 
     public Attribute(string typeName, string attrName, AttributeSpec spec) {
-        HasDefault =  !spec.Default.IsUndefined;
-        if (HasDefault && spec.Default.IsNull) Default = null;
-        else if (HasDefault) Default = spec.Default.Value;
+        HasDefault = !spec.Default.IsUndefined;
+        Default = spec.Default.Value;
         Validate = spec.ValidateFunction ?? (spec.Validate is null ? null : ValidateType(typeName, attrName, spec.Validate));
     }
 
@@ -542,6 +539,45 @@ public class MarkSpec {
     public bool? Code { get; init; }
 }
 
+/// <summary>The default value of an <see cref="AttributeSpec"/>. Unlike a plain
+/// <see cref="JsonNode"/>, it tells "no default" (<c>default(AttributeDefault)</c>, the
+/// attribute is required) apart from "the default is <c>null</c>".
+/// <br/><br/>
+/// Converts implicitly from <see cref="JsonNode"/>, so <c>Default = null</c>,
+/// <c>Default = JsonValue.Create(5)</c> and <c>Default = new(1)</c> all work.</summary>
+[JsonConverter(typeof(AttributeDefaultConverter))]
+public readonly record struct AttributeDefault {
+    private readonly bool _defined;
+
+    /// <summary>The default value. <c>null</c> both for a <c>null</c> default and for no default;
+    /// use <see cref="IsUndefined"/> to tell them apart.</summary>
+    public JsonNode? Value { get; }
+
+    public AttributeDefault(JsonNode? value) {
+        _defined = true;
+        Value = value;
+    }
+
+    /// <summary>True when no default was given, so the attribute is required.</summary>
+    public bool IsUndefined => !_defined;
+    /// <summary>True when the default is <c>null</c>.</summary>
+    public bool IsNull => _defined && Value is null;
+
+    public static implicit operator AttributeDefault(JsonNode? value) => new(value);
+}
+
+internal sealed class AttributeDefaultConverter : JsonConverter<AttributeDefault> {
+    public override bool HandleNull => true;
+
+    public override AttributeDefault Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        new(JsonNode.Parse(ref reader));
+
+    public override void Write(Utf8JsonWriter writer, AttributeDefault value, JsonSerializerOptions options) {
+        if (value.Value is null) writer.WriteNullValue();
+        else value.Value.WriteTo(writer, options);
+    }
+}
+
 /// <summary>Used to <see cref="NodeSpec.Attrs">define</see> attributes on nodes or
 /// marks.</summary>
 public class AttributeSpec {
@@ -549,9 +585,8 @@ public class AttributeSpec {
     /// value is provided. Attributes that have no default must be
     /// provided whenever a node or mark of a type that has them is
     /// created.</summary>
-    [JsonConverter(typeof(OptionalConverterFactory))]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public Optional<JsonNode> Default { get; init; }
+    public AttributeDefault Default { get; init; }
 
     /// <summary>A <c>|</c>-separated list of primitive types (<c>"number"</c>, <c>"string"</c>,
     /// <c>"boolean"</c>, <c>"null"</c> or <c>"object"</c>) that values of this attribute must
@@ -575,7 +610,7 @@ public class AttributeSpec {
 public class Schema {
     /// <summary>The <see cref="SchemaSpec"/> on which the schema is based,
     /// with the added guarantee that its <c>nodes</c> and <c>marks</c>
-    /// properties are <see cref="OrderedDictionary{String, NodeSpec}"/> instances.</summary>
+    /// properties are <see cref="OrderedDictionary{TKey, TValue}"/> instances.</summary>
     public ActiveSchemaSpec Spec { get; init; }
 
     /// <summary>An object mapping the schema's node names to node type objects.</summary>
@@ -646,18 +681,21 @@ public class Schema {
     /// <c>content</c> may be a <c>Fragment</c>, <c>null</c>, a <c>Node</c>, or an array of
     /// nodes.</summary>
     public Node Node(
-        OneOf<string, NodeType> type,
+        string type,
+        Attrs? attrs = null,
+        ContentLike? content = null,
+        List<Mark>? marks = null) => Node(NodeType(type), attrs, content, marks);
+
+    /// <inheritdoc cref="Node(string, Attrs?, ContentLike?, List{Mark}?)"/>
+    public Node Node(
+        NodeType type,
         Attrs? attrs = null,
         ContentLike? content = null,
         List<Mark>? marks = null)
     {
-        var _type = type.Match(
-            str => NodeType(str),
-            nodeType => nodeType
-        );
-        if (!ReferenceEquals(_type.Schema, this)) throw new Exception($"Node type from different schema used ({_type.Name})");
+        if (!ReferenceEquals(type.Schema, this)) throw new Exception($"Node type from different schema used ({type.Name})");
 
-        return _type.CreateChecked(attrs, content, marks);
+        return type.CreateChecked(attrs, content, marks);
     }
 
     /// <summary>Create a text node in the schema. Empty text nodes are not
@@ -668,13 +706,10 @@ public class Schema {
     }
 
     /// <summary>Create a mark with the given type and attributes.</summary>
-    public Mark Mark(OneOf<string, MarkType> type, Attrs? attrs = null) {
-        var _type = type.Match(
-            str => Marks[str],
-            markType => markType
-        );
-        return _type.Create(attrs);
-    }
+    public Mark Mark(string type, Attrs? attrs = null) => Marks[type].Create(attrs);
+
+    /// <inheritdoc cref="Mark(string, Attrs?)"/>
+    public Mark Mark(MarkType type, Attrs? attrs = null) => type.Create(attrs);
 
     /// <summary>Deserialize a node from its JSON representation.</summary>
     public Node NodeFromJSON(NodeDto json) {

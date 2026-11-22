@@ -2,7 +2,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-using OneOf;
 
 using StepWise.Prose.Collections;
 using StepWise.Prose.Text.Json;
@@ -10,7 +9,6 @@ using StepWise.Prose.Text.Json;
 
 namespace StepWise.Prose.Model;
 
-using OptionalAttrs = DotNext.Optional<Dictionary<string, DotNext.Optional<JsonNode>>>;
 
 
 public class Node {
@@ -142,15 +140,18 @@ public class Node {
 
     public ResolvedPos ResolveNoCache(int pos) => ResolvedPos.Resolve(this, pos);
 
-    public bool RangeHasMark(int from, int to, OneOf<Mark, MarkType> type) {
+    /// <summary>Test whether a given mark is present in the given range.</summary>
+    public bool RangeHasMark(int from, int to, Mark mark) =>
+        RangeHasMark(from, to, marks => mark.IsInSet(marks));
+
+    /// <summary>Test whether a mark of the given type is present in the given range.</summary>
+    public bool RangeHasMark(int from, int to, MarkType type) =>
+        RangeHasMark(from, to, marks => type.IsInSet(marks) is not null);
+
+    private bool RangeHasMark(int from, int to, Func<List<Mark>, bool> isInSet) {
         var found = false;
         if (to > from) NodesBetween(from, to, (node, _, _, _) => {
-            var isInSet = false;
-            type.Switch(
-                mark => isInSet = mark.IsInSet(node.Marks),
-                markType => isInSet = markType.IsInSet(node.Marks) is not null
-            );
-            if (isInSet) found = true;
+            if (isInSet(node.Marks)) found = true;
             return !found;
         });
         return found;
@@ -229,29 +230,24 @@ public class Node {
     }
 
     public virtual NodeDto ToJSON() {
-        var attrs = Attrs.Count == 0 ? null : new Dictionary<string, DotNext.Optional<JsonNode>>();
-        if (attrs is not null) foreach (var (name, value) in Attrs) attrs[name] = value;
-
         return new() {
             Type = Type.Name,
-            Attrs = attrs is not null ? attrs : OptionalAttrs.None,
-            Content = Content?.ChildCount > 0 ? Content.ToJSON() : DotNext.Optional<List<NodeDto>>.None,
-            Marks = Marks.Count > 0 ? Marks.Select(m => m.ToJSON()).ToList() : DotNext.Optional<List<MarkDto>>.None,
-            Text = DotNext.Optional<string>.None,
+            Attrs = Attrs.Count > 0 ? new Dictionary<string, JsonNode?>(Attrs) : null,
+            Content = Content?.ChildCount > 0 ? Content.ToJSON() : null,
+            Marks = Marks.Count > 0 ? Marks.Select(m => m.ToJSON()).ToList() : null,
         };
     }
 
     public static Node FromJSON(Schema schema, NodeDto json) {
         List<Mark>? marks = null;
-        if (json.Marks.HasValue)
-            marks = json.Marks.Value.Select(schema.MarkFromJSON).ToList();
-        if (json.Type == "text" && json.Text.HasValue)
-            return schema.Text(json.Text.Value, marks);
+        if (json.Marks is not null)
+            marks = json.Marks.Select(schema.MarkFromJSON).ToList();
+        if (json.Type == "text" && json.Text is not null)
+            return schema.Text(json.Text, marks);
 
-        var content = Fragment.FromJSON(schema, json.Content.HasValue ? json.Content.Value : null);
+        var content = Fragment.FromJSON(schema, json.Content);
         var attrs = new Attrs();
-        var jsonAttrs = json.Attrs.HasValue ? json.Attrs.Value : null;
-        if (jsonAttrs is not null) foreach (var (name, value) in jsonAttrs) attrs[name] = value.IsNull ? null : value.Value;
+        if (json.Attrs is not null) foreach (var (name, value) in json.Attrs) attrs[name] = value;
         return schema.NodeType(json.Type).Create(attrs, content, marks);
     }
 }
@@ -310,17 +306,14 @@ public record PositionedNode(Node? Node, int Index, int Offset) {}
 
 public record NodeDto {
     public required string Type { get; init; }
-    // Use of optional dictionary values here is to work around a bug in deserializing null JsonNodes
-    // https://github.com/dotnet/runtime/issues/85172
-    // Wasn't backported to Dotnet 7 so can remove when DotNet 8 is released.
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public OptionalAttrs Attrs { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public DotNext.Optional<List<NodeDto>> Content { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public DotNext.Optional<string> Text { get; set; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public DotNext.Optional<List<MarkDto>> Marks { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonNode?>? Attrs { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<NodeDto>? Content { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Text { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<MarkDto>? Marks { get; init; }
 
     public JsonElement ToJsonElement() =>
         JsonSerializer.SerializeToElement(this, ProseJson.JsonOptions);

@@ -57,8 +57,8 @@ public class ReplaceStep : Step {
         return new() {
             From = From,
             To = To,
-            Slice = Slice.Size == 0 ? DotNext.Optional<SliceDto>.None : Slice.ToJSON(),
-            Structure = Structure ? true : DotNext.Optional<bool?>.None
+            Slice = Slice.Size == 0 ? null : Slice.ToJSON(),
+            Structure = Structure ? true : null
         };
     }
 
@@ -71,8 +71,8 @@ public class ReplaceStep : Step {
     public static int MapBias { get; set; } = 1;
 
     public static ReplaceStep FromJSON(Schema schema, ReplaceStepDto json) {
-        var sliceJson = json.Slice.HasValue ? json.Slice.Value : null;
-        var structure = json.Structure.HasValue && (bool)json.Structure.Value!;
+        var sliceJson = json.Slice;
+        var structure = json.Structure == true;
         return new(json.From, json.To, Slice.FromJSON(schema, sliceJson), structure);
     }
 }
@@ -145,14 +145,14 @@ public class ReplaceAroundStep : Step {
             GapFrom = GapFrom,
             GapTo = GapTo,
             Insert = Insert,
-            Slice = Slice.Size == 0 ? DotNext.Optional<SliceDto>.None : Slice.ToJSON(),
-            Structure = Structure ? true : DotNext.Optional<bool?>.None
+            Slice = Slice.Size == 0 ? null : Slice.ToJSON(),
+            Structure = Structure ? true : null
         };
     }
 
     public static ReplaceAroundStep FromJSON(Schema schema, ReplaceAroundStepDto json) {
-        var sliceJson = json.Slice.HasValue ? json.Slice.Value : null;
-        var structure = json.Structure.HasValue && (bool)json.Structure.Value!;
+        var sliceJson = json.Slice;
+        var structure = json.Structure == true;
         return new(json.From, json.To, json.GapFrom, json.GapTo,
                    Slice.FromJSON(schema, sliceJson), json.Insert, structure);
     }
@@ -184,10 +184,10 @@ public record ReplaceStepDto : StepDto {
     public override string StepType { get; } = "replace";
     public required int From { get; init; }
     public required int To { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public DotNext.Optional<SliceDto> Slice { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public DotNext.Optional<bool?> Structure { get; init; } = false;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SliceDto? Slice { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Structure { get; init; }
 }
 
 public record ReplaceAroundStepDto : StepDto {
@@ -198,8 +198,8 @@ public record ReplaceAroundStepDto : StepDto {
     public required int GapFrom { get; init; }
     public required int GapTo { get; init; }
     public required int Insert { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public DotNext.Optional<SliceDto> Slice { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public DotNext.Optional<bool?> Structure { get; init; } = false;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SliceDto? Slice { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Structure { get; init; }
 }

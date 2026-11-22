@@ -6,7 +6,6 @@ using StepWise.Prose.Collections;
 
 namespace StepWise.Prose.Model;
 
-using OptionalAttrs = DotNext.Optional<Dictionary<string, DotNext.Optional<JsonNode>>>;
 
 public class MarkList : List<Mark> {}
 
@@ -66,21 +65,17 @@ public class Mark {
     }
 
     public MarkDto ToJSON() {
-        var attrs = Attrs.Count == 0 ? null : new Dictionary<string, DotNext.Optional<JsonNode>>();
-        if (attrs is not null) foreach (var (name, value) in Attrs) attrs[name] = value;
-
         return new() {
             Type = Type.Name,
-            Attrs = attrs is not null ? attrs : OptionalAttrs.None
+            Attrs = Attrs.Count > 0 ? new Dictionary<string, JsonNode?>(Attrs) : null,
         };
     }
 
     public static Mark FromJSON(Schema schema, MarkDto json) {
         if (!schema.Marks.TryGetValue(json.Type, out var type)) throw new Exception($"There is no mark type {json.Type}");
 
-        var jsonAttrs = json.Attrs.HasValue ? json.Attrs.Value : new Dictionary<string, DotNext.Optional<JsonNode>>();
         var attrs = new Attrs();
-        foreach (var (name, value) in jsonAttrs) attrs[name] = value.IsNull ? null : value.Value;
+        if (json.Attrs is not null) foreach (var (name, value) in json.Attrs) attrs[name] = value;
         return type.Create(attrs);
     }
 
@@ -115,9 +110,6 @@ public class Mark {
 
 public record MarkDto {
     public required string Type { get; init; }
-    // Use of optional dictionary values here is to work around a bug in deserializing null JsonNodes
-    // https://github.com/dotnet/runtime/issues/85172
-    // Wasn't backported to Dotnet 7 so can remove when DotNet 8 is released.
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public OptionalAttrs Attrs { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, JsonNode?>? Attrs { get; init; }
 }

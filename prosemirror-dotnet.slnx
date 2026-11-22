@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/StepWise.ProseMirror.csproj" />
+  <Project Path="test/StepWise.ProseMirror.Tests/StepWise.ProseMirror.Tests.csproj" />
+</Solution>

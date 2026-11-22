@@ -1,7 +1,5 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
-
-using OneOf;
-using OneOf.Types;
 
 
 namespace StepWise.Prose.Model;
@@ -12,7 +10,8 @@ public class ContentMatch {
     public static ContentMatch Empty { get; } = new(true);
 
     public List<MatchEdge> Next { get; init; } = new();
-    public List<OneOf<NodeType, List<NodeType>, None>> WrapCache { get; init; } = new();
+    // Schemas, and so their content matches, are shared between threads.
+    private readonly ConcurrentDictionary<NodeType, List<NodeType>?> _wrapCache = new(ReferenceEqualityComparer.Instance);
     public bool ValidEnd { get; init; }
 
     public ContentMatch(bool validEnd) {
@@ -86,13 +85,7 @@ public class ContentMatch {
     }
 
     public List<NodeType>? FindWrapping(NodeType target) {
-        for (var i = 0; i < WrapCache.Count; i += 2)
-            if (ReferenceEquals(WrapCache[i].Value, target)) return WrapCache[i + 1].Value is List<NodeType> list? list : null;
-        var computed = ComputeWrapping(target);
-        WrapCache.Add(target);
-        if (computed is not null) WrapCache.Add(computed);
-        else WrapCache.Add(new None());
-        return computed;
+        return _wrapCache.GetOrAdd(target, ComputeWrapping);
     }
 
     public record Active(ContentMatch Match, NodeType? Type, Active? Via) {}

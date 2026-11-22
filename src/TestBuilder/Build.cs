@@ -1,20 +1,29 @@
 using System.Dynamic;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
-using OneOf;
-using DotNext;
-
-using StepWise.Prose.Collections;
 using StepWise.Prose.Model;
 using StepWise.Prose.SchemaBasic;
-using System.Text.RegularExpressions;
 
 
 namespace StepWise.Prose.TestBuilder;
 
-using ChildSpec = OneOf<string, Node, MarkFlat>;
-using ChildSpec2 = OneOf<string, Node, List<Node>, MarkFlat, object>;
+
 using Tags = Dictionary<string, int>;
+
+
+/// <summary>A child for the builder functions: text (which may contain <c>&lt;name&gt;</c>
+/// position tags), a node, or the nodes produced by a mark builder.</summary>
+public readonly struct ChildSpec {
+    public object Value { get; }
+
+    private ChildSpec(object value) => Value = value;
+
+    public static implicit operator ChildSpec(string text) => new(text);
+    public static implicit operator ChildSpec(Node node) => new(node);
+    public static implicit operator ChildSpec(MarkFlat flat) => new(flat);
+}
 
 
 public class MarkFlat {
@@ -22,13 +31,13 @@ public class MarkFlat {
 
     public MarkFlat(List<Node> flat, Tags tag) {
         Flat = flat;
-        this.GetUserData().Set(Builder.TagSlot, tag);
+        Builder.SetTag(this, tag);
     }
 }
 
 public static class BuilderNodeExtensions {
     public static Tags Tag(this Node node) =>
-        node.GetUserData().TryGet(Builder.TagSlot, out var tag) && tag is Tags tags ? tags : Builder.NoTag;
+        Builder.TryGetTag(node, out var tag) ? tag : Builder.NoTag;
 }
 
 public static class Builder {
@@ -40,7 +49,11 @@ public static class Builder {
         } set => _schema.Value = value;
     }
     public static Tags NoTag {get;} = new();
-    public static readonly UserDataSlot<Tags> TagSlot = new();
+    // Tags are attached to nodes and mark groups without changing their types.
+    private static readonly ConditionalWeakTable<object, Tags> _tags = new();
+    internal static void SetTag(object target, Tags tag) => _tags.AddOrUpdate(target, tag);
+    internal static bool TryGetTag(object target, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Tags? tag) =>
+        _tags.TryGetValue(target, out tag);
 
     public static Node doc(params ChildSpec[] nodes) => doc(new(), nodes);
     public static Node doc(Attrs attrs, params ChildSpec[] nodes) =>
@@ -131,7 +144,7 @@ public static class Builder {
         foreach (var (name, value) in suppliedAttrs) attrs[name] = value;
         var (nodes, tag) = Flatten(schema, children, n => n);
         var node = pType.Create(attrs, nodes);
-        if (!ReferenceEquals(tag, NoTag)) node.GetUserData().Set(TagSlot, tag);
+        if (!ReferenceEquals(tag, NoTag)) SetTag(node, tag);
         return node;
     }
 
@@ -170,7 +183,7 @@ public static class Builder {
                 pos += strChild.Length - at;
                 if (outText.Length > 0) result.Add(f(schema.Text(outText)));
             } else {
-                if (child.Value.GetUserData().TryGet(TagSlot, out var childTag) && !ReferenceEquals(childTag, NoTag)) {
+                if (TryGetTag(child.Value, out var childTag) && !ReferenceEquals(childTag, NoTag)) {
                     if (ReferenceEquals(tag, NoTag)) tag = new();
                     foreach (var (name, value) in childTag)
                         tag[name] = value
@@ -194,10 +207,27 @@ public static class Builder {
     }
 
 
-    public delegate ChildSpec ChildBuilder(params ChildSpec2[] nodes);
+    /// <summary>Builds a mark from its children. Each argument may be text, a node, a list of
+    /// nodes, the result of a mark builder, or an object whose properties are attributes.</summary>
+    public delegate MarkFlat MarkBuilder(params object[] children);
+    /// <summary>Builds a node from its children. Each argument may be text, a node, a list of
+    /// nodes, the result of a mark builder, or an object whose properties are attributes.</summary>
+    public delegate Node NodeBuilder(params object[] children);
 
-    public delegate MarkFlat MarkBuilder(params ChildSpec2[] nodes);
-    public delegate Node NodeBuilder(params ChildSpec2[] nodes);
+    private static (List<ChildSpec> children, Attrs attrs) SplitArgs(object[] args) {
+        Attrs attrs = new();
+        List<ChildSpec> children = new();
+        foreach (var arg in args) {
+            switch (arg) {
+                case string str: children.Add(str); break;
+                case Node node: children.Add(node); break;
+                case List<Node> list: foreach (var n in list) children.Add(n); break;
+                case MarkFlat flat: children.Add(flat); break;
+                default: attrs = CreateAttrs(arg); break;
+            }
+        }
+        return (children, attrs);
+    }
 
 
     public static dynamic BuildersDynamic(Schema schema, Dictionary<string, object> spec) {
@@ -229,19 +259,8 @@ public static class Builder {
     }
 
     private static MarkBuilder MakeMarkBuilder(Schema schema, string type, Attrs defaultAttrs) {
-        MarkFlat builder(params ChildSpec2[] children) {
-            Attrs suppliedAttrs = new();
-            List<ChildSpec> _children = new();
-
-            foreach (var node in children) {
-                node.Switch(
-                    str => _children.Add(str),
-                    node => _children.Add(node),
-                    list => list.ForEach(n => _children.Add(n)),
-                    flat => _children.Add(flat),
-                    obj => suppliedAttrs = CreateAttrs(obj)
-                );
-            }
+        MarkFlat builder(params object[] args) {
+            var (_children, suppliedAttrs) = SplitArgs(args);
 
             var mTypes = schema.Marks[type!]!;
             var attrs = new Attrs(defaultAttrs ?? new());
@@ -257,26 +276,15 @@ public static class Builder {
     }
 
     private static NodeBuilder MakeBlockBuilder(Schema schema, string type, Attrs defaultAttrs) {
-        Node builder(params ChildSpec2[] children) {
-            Attrs suppliedAttrs = new();
-            List<ChildSpec> _children = new();
-
-            foreach (var _node in children) {
-                _node.Switch(
-                    str => _children.Add(str),
-                    node => _children.Add(node),
-                    list => list.ForEach(n => _children.Add(n)),
-                    flat => _children.Add(flat),
-                    obj => suppliedAttrs = CreateAttrs(obj)
-                );
-            }
+        Node builder(params object[] args) {
+            var (_children, suppliedAttrs) = SplitArgs(args);
 
             var pType = schema.NodeType(type);
             var attrs = new Attrs(defaultAttrs ?? new());
             foreach (var (name, value) in suppliedAttrs) attrs[name] = value;
             var (nodes, tag) = Flatten(schema, _children, n => n);
             var node = pType.Create(attrs, nodes);
-            if (!ReferenceEquals(tag, NoTag)) node.GetUserData().Set(TagSlot, tag);
+            if (!ReferenceEquals(tag, NoTag)) SetTag(node, tag);
             return node;
         }
         return builder;

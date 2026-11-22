@@ -2,7 +2,6 @@ using System.Collections;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-using DotNext;
 
 using StepWise.Prose.Collections;
 
@@ -10,8 +9,11 @@ using StepWise.Prose.Collections;
 namespace StepWise.Prose.Model;
 
 
-internal static class ContentLikeBuilder {
-	internal static ContentLike Create(ReadOnlySpan<Node> nodes) => new ContentLike { Content = nodes.ToArray().ToList() };
+/// <summary>Backs collection expressions (<c>[node1, node2]</c>) for <see cref="ContentLike"/>.
+/// It has to be public so that code outside this assembly can use them.</summary>
+[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+public static class ContentLikeBuilder {
+    public static ContentLike Create(ReadOnlySpan<Node> nodes) => new ContentLike { Content = nodes.ToArray().ToList() };
 }
 
 [CollectionBuilder(typeof(ContentLikeBuilder), "Create")]
@@ -22,13 +24,20 @@ public class ContentLike : IEnumerable<Node> {
     public static implicit operator ContentLike(Node node) => new() { Content = node };
     public static implicit operator ContentLike(Fragment fragment) => new() { Content = fragment };
 
-    public IEnumerator<Node> GetEnumerator() => (IEnumerator<Node>)(IEnumerable)this.GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() {
-        if (Content is Node[] stuff)
-            return stuff.GetEnumerator();
-        else
-            throw new Exception("This content is not a node list!");
+    /// <summary>Enumerates the nodes this content holds, as given: the single node, the
+    /// list's nodes, or the fragment's children.</summary>
+    public IEnumerator<Node> GetEnumerator() {
+        IEnumerable<Node> nodes = Content switch {
+            Node node => [node],
+            IEnumerable<Node> list => list,
+            Fragment fragment => fragment.Content,
+            null => [],
+            _ => throw new Exception($"Can't enumerate content of type {Content.GetType().Name}"),
+        };
+        return nodes.GetEnumerator();
     }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
 public class Fragment {
