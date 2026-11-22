@@ -1,8 +1,7 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-using DotNext;
-using DotNext.Text.Json;
 using OneOf;
 
 
@@ -293,9 +292,8 @@ public class Attribute {
     public Attribute(AttributeSpec spec) : this("", "", spec) {}
 
     public Attribute(string typeName, string attrName, AttributeSpec spec) {
-        HasDefault =  !spec.Default.IsUndefined;
-        if (HasDefault && spec.Default.IsNull) Default = null;
-        else if (HasDefault) Default = spec.Default.Value;
+        HasDefault = !spec.Default.IsUndefined;
+        Default = spec.Default.Value;
         Validate = spec.ValidateFunction ?? (spec.Validate is null ? null : ValidateType(typeName, attrName, spec.Validate));
     }
 
@@ -542,6 +540,45 @@ public class MarkSpec {
     public bool? Code { get; init; }
 }
 
+/// <summary>The default value of an <see cref="AttributeSpec"/>. Unlike a plain
+/// <see cref="JsonNode"/>, it tells "no default" (<c>default(AttributeDefault)</c>, the
+/// attribute is required) apart from "the default is <c>null</c>".
+/// <br/><br/>
+/// Converts implicitly from <see cref="JsonNode"/>, so <c>Default = null</c>,
+/// <c>Default = JsonValue.Create(5)</c> and <c>Default = new(1)</c> all work.</summary>
+[JsonConverter(typeof(AttributeDefaultConverter))]
+public readonly record struct AttributeDefault {
+    private readonly bool _defined;
+
+    /// <summary>The default value. <c>null</c> both for a <c>null</c> default and for no default;
+    /// use <see cref="IsUndefined"/> to tell them apart.</summary>
+    public JsonNode? Value { get; }
+
+    public AttributeDefault(JsonNode? value) {
+        _defined = true;
+        Value = value;
+    }
+
+    /// <summary>True when no default was given, so the attribute is required.</summary>
+    public bool IsUndefined => !_defined;
+    /// <summary>True when the default is <c>null</c>.</summary>
+    public bool IsNull => _defined && Value is null;
+
+    public static implicit operator AttributeDefault(JsonNode? value) => new(value);
+}
+
+internal sealed class AttributeDefaultConverter : JsonConverter<AttributeDefault> {
+    public override bool HandleNull => true;
+
+    public override AttributeDefault Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+        new(JsonNode.Parse(ref reader));
+
+    public override void Write(Utf8JsonWriter writer, AttributeDefault value, JsonSerializerOptions options) {
+        if (value.Value is null) writer.WriteNullValue();
+        else value.Value.WriteTo(writer, options);
+    }
+}
+
 /// <summary>Used to <see cref="NodeSpec.Attrs">define</see> attributes on nodes or
 /// marks.</summary>
 public class AttributeSpec {
@@ -549,9 +586,8 @@ public class AttributeSpec {
     /// value is provided. Attributes that have no default must be
     /// provided whenever a node or mark of a type that has them is
     /// created.</summary>
-    [JsonConverter(typeof(OptionalConverterFactory))]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public Optional<JsonNode> Default { get; init; }
+    public AttributeDefault Default { get; init; }
 
     /// <summary>A <c>|</c>-separated list of primitive types (<c>"number"</c>, <c>"string"</c>,
     /// <c>"boolean"</c>, <c>"null"</c> or <c>"object"</c>) that values of this attribute must

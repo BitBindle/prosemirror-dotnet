@@ -1,5 +1,4 @@
 using System.Text.Json;
-using DotNext.Text.Json;
 
 
 namespace StepWise.Prose.Text.Json;
@@ -10,8 +9,5 @@ namespace StepWise.Prose.Text.Json;
 public static class ProseJson {
     public static JsonSerializerOptions JsonOptions { get; } = new JsonSerializerOptions() {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Converters = {
-            new OptionalConverterFactory(),
-        },
     };
 }

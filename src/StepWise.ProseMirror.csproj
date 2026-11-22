@@ -19,7 +19,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DotNext" Version="4.12.4" />
     <PackageReference Include="OneOf" Version="3.0.255" />
   </ItemGroup>
 
