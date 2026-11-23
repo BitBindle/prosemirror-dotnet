@@ -96,7 +96,8 @@ public class Mark {
     public static List<Mark> SetFrom(List<Mark>? marks) {
         if (marks is null || marks.Count == 0) return None;
         // A stable sort, as Array.prototype.sort in JavaScript. List.Sort is not stable.
-        // A mark set is small, so an insertion sort is fast and allocates nothing more.
+        // An insertion sort is fast for a small set and allocates nothing more.
+        if (marks.Count > 16) return marks.OrderBy(m => m.Type.Rank).ToList();
         var copy = marks.ToList();
         for (var i = 1; i < copy.Count; i++) {
             var mark = copy[i];
