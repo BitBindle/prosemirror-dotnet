@@ -226,13 +226,14 @@ public class Node {
         foreach (var (attr, _) in values)
             if (!attrs.ContainsKey(attr)) throw new Exception($"Unsupported attribute {attr} for {type} of type {name}");
         foreach (var (attr, spec) in attrs)
-            spec.Validate?.Invoke(values.GetValueOrDefault(attr));
+            spec.Check(values, attr);
     }
 
     public virtual NodeDto ToJSON() {
         return new() {
             Type = Type.Name,
-            Attrs = Attrs.Count > 0 ? new Dictionary<string, JsonNode?>(Attrs) : null,
+            // An undefined attribute is not in Attrs, but JavaScript still writes the attrs of a type that has attributes.
+            Attrs = Attrs.Count > 0 || Type.Attrs.Count > 0 ? new Dictionary<string, JsonNode?>(Attrs) : null,
             Content = Content?.ChildCount > 0 ? Content.ToJSON() : null,
             Marks = Marks.Count > 0 ? Marks.Select(m => m.ToJSON()).ToList() : null,
         };

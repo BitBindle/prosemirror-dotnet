@@ -67,7 +67,8 @@ public class Mark {
     public MarkDto ToJSON() {
         return new() {
             Type = Type.Name,
-            Attrs = Attrs.Count > 0 ? new Dictionary<string, JsonNode?>(Attrs) : null,
+            // An undefined attribute is not in Attrs, but JavaScript still writes the attrs of a type that has attributes.
+            Attrs = Attrs.Count > 0 || Type.Attrs.Count > 0 ? new Dictionary<string, JsonNode?>(Attrs) : null,
         };
     }
 

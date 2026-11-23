@@ -55,7 +55,8 @@ public class AttributeList : Dictionary<string, Attribute> {
         var defaultAttrs = new Attrs();
         foreach (var (name, attr) in this) {
             if (!attr.HasDefault) return null;
-            defaultAttrs[name] = attr.Default;
+            // An undefined default leaves the attribute out, as JSON.stringify does.
+            if (!attr.DefaultIsUndefined) defaultAttrs[name] = attr.Default;
         }
         return defaultAttrs;
     }
@@ -65,8 +66,9 @@ public class AttributeList : Dictionary<string, Attribute> {
         foreach (var (name, attr) in this) {
             // As in JavaScript, without an attrs object each value is null: it is validated, and no default applies.
             if (value is not null && !value.ContainsKey(name)) {
-                if (attr.HasDefault) built[name] = attr.Default;
-                else throw new Exception($"No value supplied for attribute {name}");
+                if (!attr.HasDefault) throw new Exception($"No value supplied for attribute {name}");
+                // An undefined default leaves the attribute out.
+                if (!attr.DefaultIsUndefined) built[name] = attr.Default;
             } else {
                 var given = value?[name];
                 attr.Validate?.Invoke(given);
@@ -283,32 +285,51 @@ public class NodeType {
 public class Attribute {
     public bool HasDefault { get; init; }
     public JsonNode? Default { get; init; }
+    /// <summary>True when the default is JavaScript's <c>undefined</c> (see
+    /// <see cref="AttributeSpec.UndefinedDefault"/>). A node or mark that does not set the
+    /// attribute then leaves it out of its <see cref="Model.Attrs"/>.</summary>
+    public bool DefaultIsUndefined { get; init; }
     public bool IsRequired => !HasDefault;
     /// <summary>Throws when a value is not valid for this attribute.</summary>
     public Action<JsonNode?>? Validate { get; init; }
+
+    // The type check of AttributeSpec.Validate, by type name. It also checks an undefined value.
+    private readonly Action<string>? _checkType;
 
     [Obsolete("Pass the type and attribute names, so validation errors can name them.")]
     public Attribute(AttributeSpec spec) : this("", "", spec) {}
 
     public Attribute(string typeName, string attrName, AttributeSpec spec) {
-        HasDefault = !spec.Default.IsUndefined;
+        DefaultIsUndefined = spec.UndefinedDefault && spec.Default.IsUndefined;
+        HasDefault = !spec.Default.IsUndefined || DefaultIsUndefined;
         Default = spec.Default.Value;
-        Validate = spec.ValidateFunction ?? (spec.Validate is null ? null : ValidateType(typeName, attrName, spec.Validate));
+        var checkType = spec.ValidateFunction is null && spec.Validate is not null ? CheckType(typeName, attrName, spec.Validate) : null;
+        _checkType = checkType;
+        Validate = spec.ValidateFunction ?? (checkType is null ? null : value => checkType(TypeOf(value)));
     }
 
-    private static Action<JsonNode?> ValidateType(string typeName, string attrName, string type) {
+    // Validates the value of this attribute in a set of attributes. An attribute that is not in the
+    // set is undefined: the type check names it "undefined", and a validate function gets null.
+    internal void Check(Attrs values, string name) {
+        if (values.TryGetValue(name, out var value)) Validate?.Invoke(value);
+        else if (_checkType is not null) _checkType("undefined");
+        else Validate?.Invoke(null);
+    }
+
+    private static Action<string> CheckType(string typeName, string attrName, string type) {
         var types = type.Split('|');
-        return value => {
-            var name = value is null ? "null" : value.GetValueKind() switch {
-                System.Text.Json.JsonValueKind.String => "string",
-                System.Text.Json.JsonValueKind.Number => "number",
-                System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False => "boolean",
-                _ => "object",
-            };
+        return name => {
             if (!types.Contains(name))
                 throw new Exception($"Expected value of type {string.Join(",", types)} for attribute {attrName} on type {typeName}, got {name}");
         };
     }
+
+    private static string TypeOf(JsonNode? value) => value is null ? "null" : value.GetValueKind() switch {
+        System.Text.Json.JsonValueKind.String => "string",
+        System.Text.Json.JsonValueKind.Number => "number",
+        System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False => "boolean",
+        _ => "object",
+    };
 }
 
 /// <summary>Like nodes, marks (which are associated with nodes to signify
@@ -588,8 +609,15 @@ public class AttributeSpec {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public AttributeDefault Default { get; init; }
 
+    /// <summary>True when the default is JavaScript's <c>undefined</c> (<c>default: undefined</c>
+    /// in prosemirror-model), which JSON can not hold. The attribute is then optional, and a node
+    /// or mark that does not set it leaves it out of its <see cref="Model.Attrs"/>. Ignored when
+    /// <see cref="Default"/> is set.</summary>
+    [JsonIgnore]
+    public bool UndefinedDefault { get; init; }
+
     /// <summary>A <c>|</c>-separated list of primitive types (<c>"number"</c>, <c>"string"</c>,
-    /// <c>"boolean"</c>, <c>"null"</c> or <c>"object"</c>) that values of this attribute must
+    /// <c>"boolean"</c>, <c>"null"</c>, <c>"undefined"</c> or <c>"object"</c>) that values of this attribute must
     /// have. Checked when a node or mark is created with a value for the attribute,
     /// and by <see cref="Node.Check"/>.</summary>
     public string? Validate { get; init; }
