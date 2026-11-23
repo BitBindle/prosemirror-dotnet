@@ -363,7 +363,7 @@ file class Fitter {
             cur = node.Content;
         }
 
-        Unplaced = !toEnd ? new Slice(DropFromFragment(slice.Content, sliceDepth, taken), slice.OpenStart, slice.OpenEnd)
+        Unplaced = !toEnd ? new Slice(DropFromFragment(slice.Content, sliceDepth, taken), sliceDepth, slice.OpenEnd)
             : sliceDepth == 0 ? Slice.Empty
             : new Slice(DropFromFragment(slice.Content, sliceDepth - 1, 1),
                         sliceDepth - 1, openEndCount < 0 ? slice.OpenEnd : sliceDepth - 1);

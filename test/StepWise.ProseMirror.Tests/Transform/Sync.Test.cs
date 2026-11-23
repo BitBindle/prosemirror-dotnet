@@ -239,6 +239,11 @@ public class TransformSyncTest {
         var step = new ReplaceAroundStep(0, 4, 0, 4, new Slice(Fragment.From(blockquote()), 0, 0), 1, true);
         Assert.Null(step.Map(new Mapping([new StepMap([0, 4, 0]), new StepMap([0, 0, 2])])));
     }
+
+    // prosemirror-transform 1.12.5: replace fitting of an open slice that is placed in parts.
+    [Fact] public void Replace_Fits_An_Open_Slice_That_Is_Placed_In_Parts() =>
+        Assert.Equal("""{"stepType":"replace","from":2,"to":2,"slice":{"content":[{"type":"bullet_list","content":[{"type":"list_item","content":[{"type":"paragraph"},{"type":"bullet_list","content":[{"type":"list_item"}]}]}]},{"type":"bullet_list","content":[{"type":"list_item"}]}],"openStart":2,"openEnd":2}}""",
+                     Replace.replaceStep(doc(ul(li(p("ab")))), 2, 2, new Slice(Fragment.From(ul(li(p(), ul(li())))), 3, 0))!.ToJSON().ToJson());
 }
 
 // ReplaceStep.MapBias is static. The test assembly runs tests one at a time (xunit.runner.json).
