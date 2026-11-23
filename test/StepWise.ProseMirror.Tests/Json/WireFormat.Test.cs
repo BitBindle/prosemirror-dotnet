@@ -29,6 +29,8 @@ public class WireFormatTest {
         ["step: replaceAround empty"] = "{\"stepType\":\"replaceAround\",\"from\":0,\"to\":5,\"gapFrom\":1,\"gapTo\":4,\"insert\":0}",
         ["step: addMark"] = "{\"stepType\":\"addMark\",\"mark\":{\"type\":\"link\",\"attrs\":{\"href\":\"h\",\"title\":null}},\"from\":1,\"to\":3}",
         ["step: removeMark"] = "{\"stepType\":\"removeMark\",\"mark\":{\"type\":\"em\"},\"from\":1,\"to\":3}",
+        // markSet is newer than 1.5. The expected value is the JSON of prosemirror-transform 1.12.5.
+        ["step: markSet"] = "{\"stepType\":\"markSet\",\"steps\":[{\"stepType\":\"addMark\",\"mark\":{\"type\":\"em\"},\"from\":1,\"to\":2},{\"stepType\":\"addMark\",\"mark\":{\"type\":\"em\"},\"from\":3,\"to\":4}]}",
         ["step: addNodeMark"] = "{\"stepType\":\"addNodeMark\",\"pos\":1,\"mark\":{\"type\":\"em\"}}",
         ["step: attr null"] = "{\"stepType\":\"attr\",\"pos\":1,\"attr\":\"title\",\"value\":null}",
         ["step: docAttr"] = "{\"stepType\":\"docAttr\",\"attr\":\"x\",\"value\":1}",
@@ -42,6 +44,8 @@ public class WireFormatTest {
         ["parse step: replace structure false"] = "{\"stepType\":\"replace\",\"from\":1,\"to\":2}",
         ["parse step: replaceAround"] = "{\"stepType\":\"replaceAround\",\"from\":0,\"to\":5,\"gapFrom\":1,\"gapTo\":4,\"insert\":1,\"slice\":{\"content\":[{\"type\":\"blockquote\"}]},\"structure\":true}",
         ["parse step: addMark"] = "{\"stepType\":\"addMark\",\"mark\":{\"type\":\"link\",\"attrs\":{\"href\":\"h\",\"title\":null}},\"from\":1,\"to\":3}",
+        // markSet is newer than 1.5. The expected value is the JSON of prosemirror-transform 1.12.5.
+        ["parse step: markSet"] = "{\"stepType\":\"markSet\",\"steps\":[{\"stepType\":\"removeMark\",\"mark\":{\"type\":\"link\",\"attrs\":{\"href\":\"h\",\"title\":null}},\"from\":1,\"to\":3},{\"stepType\":\"addMark\",\"mark\":{\"type\":\"em\"},\"from\":1,\"to\":3}]}",
         ["spec: no default"] = "{\"validate\":\"number\"}",
         ["spec: null default"] = "{\"default\":null,\"validate\":null}",
         ["spec: value default"] = "{\"default\":1,\"validate\":null}",
