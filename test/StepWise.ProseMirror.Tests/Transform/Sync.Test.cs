@@ -244,6 +244,27 @@ public class TransformSyncTest {
     [Fact] public void Replace_Fits_An_Open_Slice_That_Is_Placed_In_Parts() =>
         Assert.Equal("""{"stepType":"replace","from":2,"to":2,"slice":{"content":[{"type":"bullet_list","content":[{"type":"list_item","content":[{"type":"paragraph"},{"type":"bullet_list","content":[{"type":"list_item"}]}]}]},{"type":"bullet_list","content":[{"type":"list_item"}]}],"openStart":2,"openEnd":2}}""",
                      Replace.replaceStep(doc(ul(li(p("ab")))), 2, 2, new Slice(Fragment.From(ul(li(p(), ul(li())))), 3, 0))!.ToJSON().ToJson());
+
+    // prosemirror-transform 1.12.5: replace fitting of nodes that are open at both ends.
+    [Fact] public void Replace_Fits_Nodes_That_Are_Open_At_Both_Ends() =>
+        Assert.Equal("""{"stepType":"replace","from":1,"to":1,"slice":{"content":[{"type":"list_item","content":[{"type":"paragraph"},{"type":"blockquote"}]}]}}""",
+                     Replace.replaceStep(doc(ul(li(p("ab")))), 1, 1, new Slice(Fragment.From(ol(li(blockquote()))), 2, 2))!.ToJSON().ToJson());
+
+    [Fact] public void Replace_Can_Extend_The_Fitting_Frontier_With_Nodes_Open_At_Both_Sides() {
+        var s = new Schema(new SchemaSpec {
+            Nodes = new OrderedDictionary<string, NodeSpec> {
+                ["doc"] = new() { Content = "header+" },
+                ["header"] = new() { Content = "title summary?" },
+                ["title"] = new() { Content = "inline*" },
+                ["summary"] = new() { Content = "inline*" },
+                ["text"] = new() { Group = "inline" },
+            },
+        });
+        var d = s.Node("doc", null, new List<Node> { s.Node("header", null, new List<Node> {
+            s.Node("title", null, new List<Node>()), s.Node("summary", null, new List<Node>()) }) });
+        var tr = new Transform(d).Replace(4, 4, d.Slice(2, 4, true));
+        ist(tr.Doc, s.Node("doc", null, new List<Node> { d.FirstChild!, d.FirstChild! }), eq);
+    }
 }
 
 // ReplaceStep.MapBias is static. The test assembly runs tests one at a time (xunit.runner.json).
