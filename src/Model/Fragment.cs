@@ -211,14 +211,52 @@ public class Fragment {
         return FindDiffEnd(this, other, _pos, _otherPos);
     }
 
+    // A fragment with more than this number of children can find an index with a binary search
+    // over the end positions of its children. A smaller fragment reads the children one by one.
+    private const int MaxLinearSearchChildCount = 16;
+
+    // The end position of each child, or null. A large fragment makes it when its index searches
+    // have read two times as many children as it has. Thus a fragment with few searches does not
+    // make it, and it costs less than the searches before it. If two threads make it at the same
+    // time, both arrays are equal.
+    private int[]? _childEnds;
+
+    // The number of children that the index searches of a large fragment read.
+    private int _childrenRead;
+
+    private int[]? ChildEnds() {
+        if (_childEnds is not null || _childrenRead < 2 * Content.Count) return _childEnds;
+        var ends = new int[Content.Count];
+        for (int i = 0, end = 0; i < ends.Length; i++) {
+            end += Content[i].NodeSize;
+            ends[i] = end;
+        }
+        return _childEnds = ends;
+    }
+
+    // Finds the first child whose end is at or after pos, as the loop of FindIndex does.
+    private static RetIndex FindIndexInChildEnds(int[] ends, int pos, int round) {
+        int low = 0, high = ends.Length - 1;
+        while (low < high) {
+            var middle = (low + high) / 2;
+            if (ends[middle] >= pos) high = middle;
+            else low = middle + 1;
+        }
+        if (ends[low] == pos || round > 0) return new RetIndex(low + 1, ends[low]);
+        return new RetIndex(low, low == 0 ? 0 : ends[low - 1]);
+    }
+
     public RetIndex FindIndex(int pos, int round = -1) {
         if (pos == 0) return new RetIndex(0, pos);
         if (pos == Size) return new RetIndex(Content.Count, pos);
         if (pos > Size || pos < 0) throw new Exception($"Position {pos} outside of fragment ({this})");
+        var large = Content.Count > MaxLinearSearchChildCount;
+        if (large && ChildEnds() is { } ends) return FindIndexInChildEnds(ends, pos, round);
         for (int i = 0, curPos = 0;; i++) {
             var cur = Child(i);
             var end = curPos + cur.NodeSize;
             if (end >= pos) {
+                if (large) _childrenRead += i + 1;
                 if (end == pos || round > 0) return new RetIndex(i + 1, end);
                 return new RetIndex(i, curPos);
             }
