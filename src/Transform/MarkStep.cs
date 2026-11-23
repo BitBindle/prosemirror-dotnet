@@ -118,6 +118,48 @@ public class RemoveMarkStep : Step {
         new(json.From, json.To, schema.MarkFromJSON(json.Mark));
 }
 
+/// <summary>A set of mark steps that apply one after the other. The inverse of an
+/// <see cref="AddMarkStep"/> or a <see cref="RemoveMarkStep"/> can be one.</summary>
+public class MarkSetStep : Step {
+    /// <summary>The steps. Each step is an <see cref="AddMarkStep"/>, a <see cref="RemoveMarkStep"/>,
+    /// or the inverse of one of them.</summary>
+    public IReadOnlyList<Step> Steps { get; }
+
+    public MarkSetStep(IReadOnlyList<Step> steps) {
+        Steps = steps;
+    }
+
+    public override StepResult Apply(Node doc) {
+        foreach (var step in Steps) {
+            var result = step.Apply(doc);
+            if (result.Doc is null) return result;
+            doc = result.Doc;
+        }
+        return StepResult.Ok(doc);
+    }
+
+    public override MarkSetStep Invert(Node doc) =>
+        new(Steps.Select(s => s.Invert(doc)).ToList());
+
+    public override MarkSetStep? Map(IMappable mapping) {
+        var result = new List<Step>();
+        foreach (var step in Steps) {
+            var mapped = step.Map(mapping);
+            if (mapped is not null) result.Add(mapped);
+        }
+        return result.Count > 0 ? new MarkSetStep(result) : null;
+    }
+
+    public override MarkSetStepDto ToJSON() =>
+        new() { Steps = Steps.Select(s => s.ToJSON()).ToList() };
+
+    public static MarkSetStep FromJSON(Schema schema, MarkSetStepDto json) {
+        if (json.Steps is null || !json.Steps.All(s => s is AddMarkStepDto or RemoveMarkStepDto))
+            throw new Exception("Invalid JSON for MarkSetStep");
+        return new(json.Steps.Select(s => Step.FromJSON(schema, s)).ToList());
+    }
+}
+
 public class AddNodeMarkStep : Step {
     public int Pos { get; }
     public Model.Mark Mark { get; }
@@ -215,6 +257,12 @@ public record RemoveMarkStepDto : StepDto {
     public required MarkDto Mark { get; init; }
     public required int From { get; init; }
     public required int To { get; init; }
+}
+
+public record MarkSetStepDto : StepDto {
+    [JsonIgnore]
+    public override string StepType { get; } = "markSet";
+    public required List<StepDto> Steps { get; init; }
 }
 
 public record AddNodeMarkStepDto : StepDto {

@@ -255,4 +255,37 @@ public class MarkStepSyncTest {
     [Fact] public void Map_Of_A_RemoveMark_Step_Keeps_The_Text_Between_Two_Deletions() =>
         Assert.Equal("""{"stepType":"removeMark","mark":{"type":"em"},"from":1,"to":3}""",
                      Json(new RemoveMarkStep(2, 6, Em).Map(new StepMap([1, 2, 0, 5, 2, 0]))));
+
+    static Step StepFromJSON(string json) => Step.FromJSON(schema, StepDto.FromJson(json)!);
+
+    const string EmMarkSet = """{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"em"},"from":1,"to":3},{"stepType":"removeMark","mark":{"type":"em"},"from":2,"to":3}]}""";
+
+    [Fact] public void A_MarkSet_Step_Comes_From_JSON() =>
+        Assert.Equal(EmMarkSet, Json(StepFromJSON(EmMarkSet)));
+
+    [Fact] public void A_MarkSet_Step_Applies_Its_Steps_In_Order() =>
+        ist(StepFromJSON(EmMarkSet).Apply(doc(p("abc"))).Doc!, doc(p(em("a"), "bc")), eq);
+
+    [Fact] public void A_MarkSet_Step_Maps_Each_Step() =>
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"em"},"from":3,"to":5},{"stepType":"removeMark","mark":{"type":"em"},"from":4,"to":5}]}""",
+                     Json(StepFromJSON(EmMarkSet).Map(new StepMap([0, 0, 2]))));
+
+    [Fact] public void A_MarkSet_Step_Is_Dropped_When_Each_Step_Is_Dropped() =>
+        Assert.Null(StepFromJSON(EmMarkSet).Map(new StepMap([0, 5, 0])));
+
+    [Fact] public void A_MarkSet_Step_Inverts_Each_Step() =>
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"removeMark","mark":{"type":"em"},"from":1,"to":3}]}""",
+                     Json(StepFromJSON("""{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"em"},"from":1,"to":3}]}""").Invert(doc(p("abc")))));
+
+    [Fact] public void A_Nested_MarkSet_Step_Fails_From_JSON() =>
+        ThrowsWithMessage(() => StepFromJSON("""{"stepType":"markSet","steps":[{"stepType":"markSet","steps":[]}]}"""),
+                          "Invalid JSON for MarkSetStep");
+
+    [Fact] public void A_MarkSet_Step_Without_Steps_Fails_From_JSON() =>
+        ThrowsWithMessage(() => StepFromJSON("""{"stepType":"markSet","steps":null}"""),
+                          "Invalid JSON for MarkSetStep");
+
+    [Fact] public void A_MarkSet_Step_With_A_Replace_Step_Fails_From_JSON() =>
+        ThrowsWithMessage(() => StepFromJSON("""{"stepType":"markSet","steps":[{"stepType":"replace","from":1,"to":2}]}"""),
+                          "Invalid JSON for MarkSetStep");
 }

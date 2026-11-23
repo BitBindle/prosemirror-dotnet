@@ -22,6 +22,7 @@ public class StepDtoConverter : JsonConverter<StepDto>
             "replaceAround" => typeof(ReplaceAroundStepDto),
             "addMark" => typeof(AddMarkStepDto),
             "removeMark" => typeof(RemoveMarkStepDto),
+            "markSet" => typeof(MarkSetStepDto),
             "addNodeMark" => typeof(AddNodeMarkStepDto),
             "removeNodeMark" => typeof(RemoveNodeMarkStepDto),
             "attr" => typeof(AttrStepDto),
