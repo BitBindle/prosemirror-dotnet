@@ -39,8 +39,22 @@ public class AddMarkStep : Step {
         return StepResult.FromReplace(doc, From, To, slice);
     }
 
-    public override RemoveMarkStep Invert(Node doc) =>
-        new(From, To, Mark);
+    public override Step Invert(Node doc) {
+        var steps = new List<Step>();
+        doc.NodesBetween(From, To, (node, pos, _, _) => {
+            if (node.IsInline && node.IsAtom) {
+                var added = Mark.AddToSet(node.Marks);
+                if (!Model.Mark.SameSet(added, node.Marks)) {
+                    int from = Math.Max(From, pos), to = Math.Min(To, pos + node.NodeSize);
+                    MarkSetStep.PushMarkStep(false, from, to, Mark, steps);
+                    foreach (var mark in node.Marks)
+                        if (!mark.IsInSet(added)) MarkSetStep.PushMarkStep(true, from, to, mark, steps);
+                }
+            }
+            return true;
+        });
+        return steps.Count == 1 ? steps[0] : new MarkSetStep(steps);
+    }
 
     public override AddMarkStep? Map(IMappable mapping) {
         var from = mapping.Map(From, 1);
@@ -88,8 +102,15 @@ public class RemoveMarkStep : Step {
         return StepResult.FromReplace(doc, From, To, slice);
     }
 
-    public override AddMarkStep Invert(Node doc) =>
-        new(From, To, Mark);
+    public override Step Invert(Node doc) {
+        var steps = new List<Step>();
+        doc.NodesBetween(From, To, (node, pos, _, _) => {
+            if (node.IsInline && node.IsAtom && Mark.IsInSet(node.Marks))
+                MarkSetStep.PushMarkStep(true, Math.Max(From, pos), Math.Min(To, pos + node.NodeSize), Mark, steps);
+            return true;
+        });
+        return steps.Count == 1 ? steps[0] : new MarkSetStep(steps);
+    }
 
     public override RemoveMarkStep? Map(IMappable mapping) {
         var from = mapping.Map(From, 1);
@@ -157,6 +178,18 @@ public class MarkSetStep : Step {
         if (json.Steps is null || !json.Steps.All(s => s is AddMarkStepDto or RemoveMarkStepDto))
             throw new Exception("Invalid JSON for MarkSetStep");
         return new(json.Steps.Select(s => Step.FromJSON(schema, s)).ToList());
+    }
+
+    /// <summary>Adds a mark step to <paramref name="target"/>. Extends the last step instead when it
+    /// is of the same kind, has the same mark and ends at <paramref name="from"/>.</summary>
+    internal static void PushMarkStep(bool add, int from, int to, Model.Mark mark, List<Step> target) {
+        var last = target.Count > 0 ? target[^1] : null;
+        if (add && last is AddMarkStep a && a.To == from && a.Mark.Eq(mark))
+            target[^1] = new AddMarkStep(a.From, to, mark);
+        else if (!add && last is RemoveMarkStep r && r.To == from && r.Mark.Eq(mark))
+            target[^1] = new RemoveMarkStep(r.From, to, mark);
+        else
+            target.Add(add ? new AddMarkStep(from, to, mark) : new RemoveMarkStep(from, to, mark));
     }
 }
 

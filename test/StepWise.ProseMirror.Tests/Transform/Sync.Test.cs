@@ -288,4 +288,50 @@ public class MarkStepSyncTest {
     [Fact] public void A_MarkSet_Step_With_A_Replace_Step_Fails_From_JSON() =>
         ThrowsWithMessage(() => StepFromJSON("""{"stepType":"markSet","steps":[{"stepType":"replace","from":1,"to":2}]}"""),
                           "Invalid JSON for MarkSetStep");
+
+    static readonly Model.Mark LinkB = schema.Mark("link", new() { ["href"] = "b" });
+
+    // A link mark excludes another link mark.
+    static Node Mixed() => doc(p("x", a(new { href = "a" }, "y"), "z"));
+
+    // The inverse of a mark step restores the marks of each inline leaf. It is a "markSet" step
+    // when it has more or fewer than one step.
+    [Fact] public void Invert_Of_AddMark_Restores_An_Excluded_Mark() =>
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"removeMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":1,"to":3},{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"a","title":null}},"from":2,"to":3},{"stepType":"removeMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":3,"to":4}]}""",
+                     Json(new AddMarkStep(1, 4, LinkB).Invert(Mixed())));
+
+    [Fact] public void Invert_Of_AddMark_Cancels_The_Step() {
+        var step = new AddMarkStep(1, 4, LinkB);
+        ist(step.Invert(Mixed()).Apply(step.Apply(Mixed()).Doc!).Doc!, Mixed(), eq);
+    }
+
+    [Fact] public void Invert_Of_AddMark_Keeps_The_Mark_Where_It_Was() {
+        var d = doc(p("x", em("y"), "z"));
+        var step = new AddMarkStep(1, 4, Em);
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"removeMark","mark":{"type":"em"},"from":1,"to":2},{"stepType":"removeMark","mark":{"type":"em"},"from":3,"to":4}]}""",
+                     Json(step.Invert(d)));
+        ist(step.Invert(d).Apply(step.Apply(d).Doc!).Doc!, d, eq);
+    }
+
+    [Fact] public void Invert_Of_AddMark_Where_The_Mark_Is_Everywhere_Changes_Nothing() {
+        var d = doc(p(em("ab")));
+        var inverse = new AddMarkStep(1, 3, Em).Invert(d);
+        Assert.Equal("""{"stepType":"markSet","steps":[]}""", Json(inverse));
+        ist(inverse.Apply(d).Doc!, d, eq);
+    }
+
+    [Fact] public void Invert_Of_RemoveMark_Adds_The_Mark_Only_Where_It_Was() =>
+        Assert.Equal("""{"stepType":"addMark","mark":{"type":"em"},"from":2,"to":3}""",
+                     Json(new RemoveMarkStep(1, 4, Em).Invert(doc(p("a", em("b"), "c")))));
+
+    [Fact] public void Invert_Of_RemoveMark_Joins_Adjacent_Ranges() =>
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"em"},"from":1,"to":2},{"stepType":"addMark","mark":{"type":"em"},"from":3,"to":5}]}""",
+                     Json(new RemoveMarkStep(1, 6, Em).Invert(doc(p(em("a"), "b", em("c"), strong(em("d")), "e")))));
+
+    // The inverse of an inverse inverts each inner step, so it can nest a "markSet" step.
+    [Fact] public void Invert_Of_A_MarkSet_Step_Can_Nest_A_MarkSet_Step() {
+        var step = new AddMarkStep(1, 4, LinkB);
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":1,"to":3},{"stepType":"markSet","steps":[{"stepType":"removeMark","mark":{"type":"link","attrs":{"href":"a","title":null}},"from":2,"to":3},{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":2,"to":3}]},{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":3,"to":4}]}""",
+                     Json(step.Invert(Mixed()).Invert(step.Apply(Mixed()).Doc!)));
+    }
 }
