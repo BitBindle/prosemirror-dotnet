@@ -134,7 +134,7 @@ public class ReplaceAroundStep : Step {
         var to = mapping.MapResult(To, -1);
         var gapFrom = From == GapFrom ? from.Pos : mapping.Map(GapFrom, -1);
         var gapTo = To == GapTo ? to.Pos : mapping.Map(GapTo, 1);
-        if ((from.DeletedAcross && to.DeletedAcross) || gapFrom < from.Pos || gapTo > to.Pos) return null;
+        if ((from.DeletedAcross && to.DeletedAcross) || gapFrom < from.Pos || gapTo > to.Pos || gapFrom > gapTo) return null;
         return new(from.Pos, to.Pos, gapFrom, gapTo, Slice, Insert, Structure);
     }
 

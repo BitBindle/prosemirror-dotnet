@@ -11,7 +11,8 @@ namespace StepWise.Prose.Transformation.Test;
 using static Builder;
 using static StepWise.Prose.Test.TestUtils;
 
-// Ports of the tests that came with changes in prosemirror-transform up to 1.12.2.
+// Ports of the tests that came with changes in prosemirror-transform up to 1.12.5. Where a change has
+// no upstream test, the expected value of the test here is the result of the JavaScript package.
 
 public class TransformSyncTest {
     static int Tag(Node node, string tag) => node.Tag()[tag];
@@ -219,6 +220,24 @@ public class TransformSyncTest {
         var mapped = new AttrStep(2, "level", JsonValue.Create(2)).Map(new StepMap([2, 0, 3]));
         Assert.NotNull(mapped);
         Assert.Equal(5, mapped!.Pos);
+    }
+
+    // prosemirror-transform 1.12.5: a ReplaceAroundStep is dropped when a change deletes its gap range.
+    [Fact] public void Replace_Around_Map_Drops_A_Collapsed_Range_Mapped_Over_An_Insertion() {
+        foreach (var pos in new[] { 0, 5 }) {
+            var step = new ReplaceAroundStep(pos, pos, pos, pos, Slice.Empty, 0, true);
+            var before = doc(p("abcd"));
+            var applied = step.Apply(before);
+            Assert.Null(applied.Failed);
+            ist(applied.Doc!, before, eq);
+            ist(step.Invert(before).Apply(applied.Doc!).Doc!, before, eq);
+            Assert.Null(step.Map(new Mapping([new StepMap([pos, 0, 10])])));
+        }
+    }
+
+    [Fact] public void Map_Drops_A_ReplaceAround_Step_Whose_Gap_Range_Is_Deleted() {
+        var step = new ReplaceAroundStep(0, 4, 0, 4, new Slice(Fragment.From(blockquote()), 0, 0), 1, true);
+        Assert.Null(step.Map(new Mapping([new StepMap([0, 4, 0]), new StepMap([0, 0, 2])])));
     }
 }
 
