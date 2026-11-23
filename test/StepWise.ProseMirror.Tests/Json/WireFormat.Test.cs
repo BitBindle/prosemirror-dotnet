@@ -12,14 +12,17 @@ public class WireFormatTest {
         ["node: empty paragraph"] = "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\"}]}",
         ["node: heading attrs"] = "{\"type\":\"doc\",\"content\":[{\"type\":\"heading\",\"attrs\":{\"level\":1},\"content\":[{\"type\":\"text\",\"text\":\"x\"}]}]}",
         ["node: image null attrs"] = "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"image\",\"attrs\":{\"src\":\"image.png\",\"alt\":null,\"title\":null}}]}]}",
-        ["node: link mark with null attr"] = "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"l\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"foo\",\"title\":null}}]},{\"type\":\"text\",\"text\":\"e\",\"marks\":[{\"type\":\"em\"}]}]}]}",
+        // Marks before text, as Node.toJSON of prosemirror-model. Version 1.5 wrote text first.
+        ["node: link mark with null attr"] = "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"foo\",\"title\":null}}],\"text\":\"l\"},{\"type\":\"text\",\"marks\":[{\"type\":\"em\"}],\"text\":\"e\"}]}]}",
         ["node: to element"] = "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"x\"}]}]}",
         ["parse: minimal"] = "doc(paragraph(\"a\")) | {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"a\"}]}]}",
         ["parse: explicit nulls"] = "doc(paragraph) | {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\"}]}",
         ["parse: empty lists"] = "doc(paragraph) | {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\"}]}",
         ["parse: null attr values"] = "doc(paragraph(image)) | {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"image\",\"attrs\":{\"src\":\"x\",\"alt\":null,\"title\":null}}]}]}",
-        ["parse: mark attrs"] = "doc(paragraph(link(em(\"a\")))) | {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"a\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"h\",\"title\":null}},{\"type\":\"em\"}]}]}]}",
-        ["parse: mark null attrs"] = "doc(paragraph(em(\"a\"))) | {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"a\",\"marks\":[{\"type\":\"em\"}]}]}]}",
+        // Marks before text, as Node.toJSON of prosemirror-model. Version 1.5 wrote text first.
+        ["parse: mark attrs"] = "doc(paragraph(link(em(\"a\")))) | {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"marks\":[{\"type\":\"link\",\"attrs\":{\"href\":\"h\",\"title\":null}},{\"type\":\"em\"}],\"text\":\"a\"}]}]}",
+        // Marks before text, as Node.toJSON of prosemirror-model. Version 1.5 wrote text first.
+        ["parse: mark null attrs"] = "doc(paragraph(em(\"a\"))) | {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"marks\":[{\"type\":\"em\"}],\"text\":\"a\"}]}]}",
         ["parse: missing attr uses default"] = "doc(heading(\"a\")) | {\"type\":\"doc\",\"content\":[{\"type\":\"heading\",\"attrs\":{\"level\":1},\"content\":[{\"type\":\"text\",\"text\":\"a\"}]}]}",
         ["step: replace"] = "{\"stepType\":\"replace\",\"from\":1,\"to\":2,\"slice\":{\"content\":[{\"type\":\"text\",\"text\":\"x\"}]}}",
         ["step: replace empty slice"] = "{\"stepType\":\"replace\",\"from\":1,\"to\":2}",
