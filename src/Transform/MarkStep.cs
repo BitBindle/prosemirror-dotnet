@@ -43,10 +43,10 @@ public class AddMarkStep : Step {
         new(From, To, Mark);
 
     public override AddMarkStep? Map(IMappable mapping) {
-        var from = mapping.MapResult(From, 1);
-        var to = mapping.MapResult(To, -1);
-        if (from.Deleted && to.Deleted || from.Pos >= to.Pos) return null;
-        return new AddMarkStep(from.Pos, to.Pos, Mark);
+        var from = mapping.Map(From, 1);
+        var to = mapping.Map(To, -1);
+        if (from >= to) return null;
+        return new AddMarkStep(from, to, Mark);
     }
 
     public override AddMarkStep? Merge(Step other) {
@@ -92,10 +92,10 @@ public class RemoveMarkStep : Step {
         new(From, To, Mark);
 
     public override RemoveMarkStep? Map(IMappable mapping) {
-        var from = mapping.MapResult(From, 1);
-        var to = mapping.MapResult(To, -1);
-        if (from.Deleted && to.Deleted || from.Pos >= to.Pos) return null;
-        return new(from.Pos, to.Pos, Mark);
+        var from = mapping.Map(From, 1);
+        var to = mapping.Map(To, -1);
+        if (from >= to) return null;
+        return new(from, to, Mark);
     }
 
     public override RemoveMarkStep? Merge(Step other) {

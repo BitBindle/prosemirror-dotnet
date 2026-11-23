@@ -239,3 +239,20 @@ public class MapBiasTest {
         }
     }
 }
+
+// Ports of the changes to mark steps in prosemirror-transform 1.12.3 and 1.12.4. Upstream has no
+// tests for them, so the expected values are the results of the JavaScript package 1.12.5.
+public class MarkStepSyncTest {
+    static readonly Model.Mark Em = schema.Mark("em");
+
+    static string Json(Step? step) => step is null ? "null" : step.ToJSON().ToJson();
+
+    // A mark step stays when the text between its ends stays, also when both ends are deleted.
+    [Fact] public void Map_Of_An_AddMark_Step_Keeps_The_Text_Between_Two_Deletions() =>
+        Assert.Equal("""{"stepType":"addMark","mark":{"type":"em"},"from":1,"to":3}""",
+                     Json(new AddMarkStep(2, 6, Em).Map(new StepMap([1, 2, 0, 5, 2, 0]))));
+
+    [Fact] public void Map_Of_A_RemoveMark_Step_Keeps_The_Text_Between_Two_Deletions() =>
+        Assert.Equal("""{"stepType":"removeMark","mark":{"type":"em"},"from":1,"to":3}""",
+                     Json(new RemoveMarkStep(2, 6, Em).Map(new StepMap([1, 2, 0, 5, 2, 0]))));
+}
