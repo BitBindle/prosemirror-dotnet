@@ -139,8 +139,22 @@ public class Transform {
         return this;
     }
 
+    /// <summary>Set the attribute of the node at <c>pos</c> to <c>undefined</c>, which gives it its
+    /// default. If the attribute has no default, the step throws when it is applied.</summary>
+    public Transform SetNodeAttribute(int pos, string attr) {
+        Step(new AttrStep(pos, attr));
+        return this;
+    }
+
     public Transform SetDocAttribute(string attr, JsonNode? value) {
         Step(new DocAttrStep(attr, value));
+        return this;
+    }
+
+    /// <summary>Set the attribute of the document node to <c>undefined</c>, which gives it its
+    /// default. If the attribute has no default, the step throws when it is applied.</summary>
+    public Transform SetDocAttribute(string attr) {
+        Step(new DocAttrStep(attr));
         return this;
     }
 
