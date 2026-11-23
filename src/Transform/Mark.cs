@@ -10,34 +10,16 @@ public static partial class Mark {
     private static partial Regex _NewLineRegex();
 
     public static void AddMark(Transform tr, int from, int to, Model.Mark mark) {
-        List<Step> removed = new(), added = new();
-        RemoveMarkStep? removing = null;
-        AddMarkStep? adding = null;
+        var added = new List<Step>();
         tr.Doc.NodesBetween(from, to, (node, pos, parent, _) => {
             if (!node.IsInline) return true;
             var marks = node.Marks;
             if (!mark.IsInSet(marks) && parent!.Type.AllowsMarkType(mark.Type)) {
                 int start = Math.Max(pos, from), end = Math.Min(pos + node.NodeSize, to);
-                var newSet = mark.AddToSet(marks);
-
-                for (var i = 0; i < marks.Count; i++) {
-                    if (!marks[i].IsInSet(newSet)) {
-                    if (removing is not null && removing.To == start && removing.Mark.Eq(marks[i]))
-                        removing.To = end;
-                    else
-                        removed.Add(removing = new RemoveMarkStep(start, end, marks[i]));
-                    }
-                }
-
-                if (adding is not null && adding.To == start)
-                    adding.To = end;
-                else
-                    added.Add(adding = new AddMarkStep(start, end, mark));
+                MarkSetStep.PushMarkStep(true, start, end, mark, added);
             }
             return true;
         });
-
-        removed.ForEach(s => tr.Step(s));
         added.ForEach(s => tr.Step(s));
     }
 

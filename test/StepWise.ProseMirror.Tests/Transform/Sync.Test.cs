@@ -334,4 +334,13 @@ public class MarkStepSyncTest {
         Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":1,"to":3},{"stepType":"markSet","steps":[{"stepType":"removeMark","mark":{"type":"link","attrs":{"href":"a","title":null}},"from":2,"to":3},{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":2,"to":3}]},{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":3,"to":4}]}""",
                      Json(step.Invert(Mixed()).Invert(step.Apply(Mixed()).Doc!)));
     }
+
+    // AddMarkStep.Apply removes an excluded mark, and its inverse restores it.
+    [Fact] public void AddMark_Removes_An_Excluded_Mark_Without_A_Separate_Step() {
+        var tr = new Transform(Mixed()).AddMark(1, 4, LinkB);
+        Assert.Equal(["""{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":1,"to":4}"""],
+                     tr.Steps.Select(Json));
+        ist(tr.Doc, doc(p(a(new { href = "b" }, "xyz"))), eq);
+        ist(tr.Steps[0].Invert(tr.Docs[0]).Apply(tr.Doc).Doc!, Mixed(), eq);
+    }
 }
