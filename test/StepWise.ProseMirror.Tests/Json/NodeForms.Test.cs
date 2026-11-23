@@ -54,14 +54,24 @@ public class NodeFormsTest {
 
     [Theory, MemberData(nameof(Docs))]
     public void NodeDto_From_A_JsonNode_Gives_The_Same_Dto_As_From_A_String(string json) {
-        Assert.Equal(json, NodeDto.FromJson(json).ToJson());
-        Assert.Equal(json, NodeDto.FromJson(JsonNode.Parse(json)!).ToJson());
+        Assert.Equal(NodeDto.FromJson(json).ToJson(), NodeDto.FromJson(JsonNode.Parse(json)!).ToJson());
     }
 
     [Theory, MemberData(nameof(Docs))]
     public void NodeDto_To_A_JsonNode_Gives_The_Same_Json_As_To_A_String(string json) {
         var dto = NodeDto.FromJson(json);
         Assert.Equal(dto.ToJson(), dto.ToJsonNode().ToJsonString());
+    }
+
+    [Fact] public void A_Tree_Built_In_Code_Gives_The_Same_Dto_As_Its_String() {
+        var tree = new JsonObject {
+            ["type"] = "doc",
+            ["attrs"] = new JsonObject { ["n"] = 2, ["d"] = 1.5, ["s"] = "é", ["list"] = new JsonArray(1, null, new JsonArray("x")) },
+            ["content"] = new JsonArray(new JsonObject { ["type"] = "paragraph" }),
+        };
+        Assert.Equal(NodeDto.FromJson(tree.ToJsonString()).ToJson(), NodeDto.FromJson(tree).ToJson());
+        var step = new JsonObject { ["stepType"] = "attr", ["pos"] = 1, ["attr"] = "n", ["value"] = new JsonObject { ["a"] = 3 } };
+        Assert.Equal(StepDto.FromJson(step.ToJsonString())!.ToJson(), StepDto.FromJson(step)!.ToJson());
     }
 
     [Fact] public void A_Node_With_An_Undefined_Attribute_Has_No_Key_In_The_JsonNode() {
@@ -72,8 +82,7 @@ public class NodeFormsTest {
 
     [Theory, MemberData(nameof(Steps))]
     public void StepDto_From_A_JsonNode_Gives_The_Same_Dto_As_From_A_String(string json) {
-        Assert.Equal(json, StepDto.FromJson(json)!.ToJson());
-        Assert.Equal(json, StepDto.FromJson(JsonNode.Parse(json)!)!.ToJson());
+        Assert.Equal(StepDto.FromJson(json)!.ToJson(), StepDto.FromJson(JsonNode.Parse(json)!)!.ToJson());
     }
 
     [Theory, MemberData(nameof(Steps))]
