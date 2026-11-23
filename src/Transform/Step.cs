@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 using StepWise.Prose.Model;
@@ -66,4 +67,14 @@ public abstract record StepDto {
     public string ToJson() => JsonSerializer.Serialize(this, ProseJson.JsonOptions);
     public static StepDto? FromJson(string json) => JsonSerializer.Deserialize<StepDto>(json, ProseJson.JsonOptions);
     public static StepDto? FromJson(JsonElement json) => JsonSerializer.Deserialize<StepDto>(json, ProseJson.JsonOptions);
+
+    /// <summary>Write the step as a <see cref="JsonNode"/> tree. The JSON is the same as the
+    /// JSON of <see cref="ToJson"/>, but no string is made.</summary>
+    public JsonNode ToJsonNode() => JsonSerializer.SerializeToNode(this, ProseJson.JsonOptions)!;
+    /// <summary>Read a step from a <see cref="JsonNode"/> tree, as <see cref="FromJson(string)"/>
+    /// reads it from a string, but without a string.</summary>
+    public static StepDto? FromJson(JsonNode json) {
+        ArgumentNullException.ThrowIfNull(json);
+        return json.Deserialize<StepDto>(ProseJson.JsonOptions);
+    }
 }

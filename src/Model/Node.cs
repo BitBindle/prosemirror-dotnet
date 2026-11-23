@@ -325,4 +325,15 @@ public record NodeDto {
         JsonSerializer.Deserialize<NodeDto>(json, ProseJson.JsonOptions)!;
     public static NodeDto FromJson(JsonElement json) =>
         JsonSerializer.Deserialize<NodeDto>(json, ProseJson.JsonOptions)!;
+
+    /// <summary>Write the node as a <see cref="JsonNode"/> tree. The JSON is the same as the
+    /// JSON of <see cref="ToJson"/>, but no string is made.</summary>
+    public JsonNode ToJsonNode() =>
+        JsonSerializer.SerializeToNode(this, ProseJson.JsonOptions)!;
+    /// <summary>Read a node from a <see cref="JsonNode"/> tree, as <see cref="FromJson(string)"/>
+    /// reads it from a string, but without a string.</summary>
+    public static NodeDto FromJson(JsonNode json) {
+        ArgumentNullException.ThrowIfNull(json);
+        return json.Deserialize<NodeDto>(ProseJson.JsonOptions)!;
+    }
 }
