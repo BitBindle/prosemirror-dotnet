@@ -343,4 +343,21 @@ public class MarkStepSyncTest {
         ist(tr.Doc, doc(p(a(new { href = "b" }, "xyz"))), eq);
         ist(tr.Steps[0].Invert(tr.Docs[0]).Apply(tr.Doc).Doc!, Mixed(), eq);
     }
+
+    [Fact] public void RemoveMark_Skips_An_Inline_Node_That_Is_Not_A_Leaf() {
+        var s = new Schema(new SchemaSpec {
+            Nodes = new OrderedDictionary<string, NodeSpec> {
+                ["doc"] = new() { Content = "block+" },
+                ["paragraph"] = new() { Group = "block", Content = "inline*" },
+                ["span"] = new() { Group = "inline", Inline = true, Content = "text*" },
+                ["text"] = new() { Group = "inline" },
+            },
+            Marks = new OrderedDictionary<string, MarkSpec> { ["em"] = new() },
+        });
+        var em = s.Mark("em");
+        var d = s.Node("doc", null, new List<Node> { s.Node("paragraph", null, new List<Node> {
+            s.Text("a", [em]), s.Node("span", null, new List<Node> { s.Text("b", [em]) }), s.Text("c", [em]) }) });
+        var tr = new Transform(d).RemoveMark(1, 6, s.Marks["em"]);
+        Assert.Equal(["""{"stepType":"removeMark","mark":{"type":"em"},"from":1,"to":6}"""], tr.Steps.Select(Json));
+    }
 }

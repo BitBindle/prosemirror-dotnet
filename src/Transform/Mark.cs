@@ -36,7 +36,7 @@ public static partial class Mark {
         var matched = new List<Match>();
         var step = 0;
         tr.Doc.NodesBetween(from, to, (node, pos, _, _) => {
-            if (!node.IsInline) return true;
+            if (!node.IsInline || !node.IsAtom) return true;
             step++;
             List<Model.Mark>? toRemove = null;
             if (mark is MarkType markType) {
