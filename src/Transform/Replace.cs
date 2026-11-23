@@ -356,14 +356,13 @@ file class Fitter {
         if (toEnd && openEndCount < 0 && parent is not null && ReferenceEquals(parent.Type, Frontier.ElementAt(frontierDepth).Type) && Frontier.Count > 1)
             CloseFrontierNode();
 
-        var cur = fragment;
-        for (var i = 0; i < openEndCount; i++) {
-            var node = cur.LastChild!;
-            Frontier.Add(new(node.Type, node.ContentMatchAt(node.ChildCount)));
-            cur = node.Content;
+        Node? cur = add.Count > 0 ? add[^1] : null;
+        for (var i = 0; cur is not null && i < openEndCount; i++) {
+            Frontier.Add(new(cur.Type, cur.ContentMatchAt(cur.ChildCount)));
+            cur = cur.LastChild;
         }
 
-        Unplaced = !toEnd ? new Slice(DropFromFragment(slice.Content, sliceDepth, taken), slice.OpenStart, slice.OpenEnd)
+        Unplaced = !toEnd ? new Slice(DropFromFragment(slice.Content, sliceDepth, taken), sliceDepth, slice.OpenEnd)
             : sliceDepth == 0 ? Slice.Empty
             : new Slice(DropFromFragment(slice.Content, sliceDepth - 1, 1),
                         sliceDepth - 1, openEndCount < 0 ? slice.OpenEnd : sliceDepth - 1);

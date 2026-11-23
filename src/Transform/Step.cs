@@ -26,6 +26,7 @@ public abstract class Step {
             ReplaceAroundStepDto dto => ReplaceAroundStep.FromJSON(schema, dto),
             AddMarkStepDto dto => AddMarkStep.FromJSON(schema, dto),
             RemoveMarkStepDto dto => RemoveMarkStep.FromJSON(schema, dto),
+            MarkSetStepDto dto => MarkSetStep.FromJSON(schema, dto),
             AddNodeMarkStepDto dto => AddNodeMarkStep.FromJSON(schema, dto),
             RemoveNodeMarkStepDto dto => RemoveNodeMarkStep.FromJSON(schema, dto),
             AttrStepDto dto => AttrStep.FromJSON(schema, dto),

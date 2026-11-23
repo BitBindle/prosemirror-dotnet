@@ -11,7 +11,8 @@ namespace StepWise.Prose.Transformation.Test;
 using static Builder;
 using static StepWise.Prose.Test.TestUtils;
 
-// Ports of the tests that came with changes in prosemirror-transform up to 1.12.2.
+// Ports of the tests that came with changes in prosemirror-transform up to 1.12.5. Where a change has
+// no upstream test, the expected value of the test here is the result of the JavaScript package.
 
 public class TransformSyncTest {
     static int Tag(Node node, string tag) => node.Tag()[tag];
@@ -220,6 +221,50 @@ public class TransformSyncTest {
         Assert.NotNull(mapped);
         Assert.Equal(5, mapped!.Pos);
     }
+
+    // prosemirror-transform 1.12.5: a ReplaceAroundStep is dropped when a change deletes its gap range.
+    [Fact] public void Replace_Around_Map_Drops_A_Collapsed_Range_Mapped_Over_An_Insertion() {
+        foreach (var pos in new[] { 0, 5 }) {
+            var step = new ReplaceAroundStep(pos, pos, pos, pos, Slice.Empty, 0, true);
+            var before = doc(p("abcd"));
+            var applied = step.Apply(before);
+            Assert.Null(applied.Failed);
+            ist(applied.Doc!, before, eq);
+            ist(step.Invert(before).Apply(applied.Doc!).Doc!, before, eq);
+            Assert.Null(step.Map(new Mapping([new StepMap([pos, 0, 10])])));
+        }
+    }
+
+    [Fact] public void Map_Drops_A_ReplaceAround_Step_Whose_Gap_Range_Is_Deleted() {
+        var step = new ReplaceAroundStep(0, 4, 0, 4, new Slice(Fragment.From(blockquote()), 0, 0), 1, true);
+        Assert.Null(step.Map(new Mapping([new StepMap([0, 4, 0]), new StepMap([0, 0, 2])])));
+    }
+
+    // prosemirror-transform 1.12.5: replace fitting of an open slice that is placed in parts.
+    [Fact] public void Replace_Fits_An_Open_Slice_That_Is_Placed_In_Parts() =>
+        Assert.Equal("""{"stepType":"replace","from":2,"to":2,"slice":{"content":[{"type":"bullet_list","content":[{"type":"list_item","content":[{"type":"paragraph"},{"type":"bullet_list","content":[{"type":"list_item"}]}]}]},{"type":"bullet_list","content":[{"type":"list_item"}]}],"openStart":2,"openEnd":2}}""",
+                     Replace.replaceStep(doc(ul(li(p("ab")))), 2, 2, new Slice(Fragment.From(ul(li(p(), ul(li())))), 3, 0))!.ToJSON().ToJson());
+
+    // prosemirror-transform 1.12.5: replace fitting of nodes that are open at both ends.
+    [Fact] public void Replace_Fits_Nodes_That_Are_Open_At_Both_Ends() =>
+        Assert.Equal("""{"stepType":"replace","from":1,"to":1,"slice":{"content":[{"type":"list_item","content":[{"type":"paragraph"},{"type":"blockquote"}]}]}}""",
+                     Replace.replaceStep(doc(ul(li(p("ab")))), 1, 1, new Slice(Fragment.From(ol(li(blockquote()))), 2, 2))!.ToJSON().ToJson());
+
+    [Fact] public void Replace_Can_Extend_The_Fitting_Frontier_With_Nodes_Open_At_Both_Sides() {
+        var s = new Schema(new SchemaSpec {
+            Nodes = new OrderedDictionary<string, NodeSpec> {
+                ["doc"] = new() { Content = "header+" },
+                ["header"] = new() { Content = "title summary?" },
+                ["title"] = new() { Content = "inline*" },
+                ["summary"] = new() { Content = "inline*" },
+                ["text"] = new() { Group = "inline" },
+            },
+        });
+        var d = s.Node("doc", null, new List<Node> { s.Node("header", null, new List<Node> {
+            s.Node("title", null, new List<Node>()), s.Node("summary", null, new List<Node>()) }) });
+        var tr = new Transform(d).Replace(4, 4, d.Slice(2, 4, true));
+        ist(tr.Doc, s.Node("doc", null, new List<Node> { d.FirstChild!, d.FirstChild! }), eq);
+    }
 }
 
 // ReplaceStep.MapBias is static. The test assembly runs tests one at a time (xunit.runner.json).
@@ -237,5 +282,127 @@ public class MapBiasTest {
         } finally {
             ReplaceStep.MapBias = 1;
         }
+    }
+}
+
+// Ports of the changes to mark steps in prosemirror-transform 1.12.3 and 1.12.4. Upstream has no
+// tests for them, so the expected values are the results of the JavaScript package 1.12.5.
+public class MarkStepSyncTest {
+    static readonly Model.Mark Em = schema.Mark("em");
+
+    static string Json(Step? step) => step is null ? "null" : step.ToJSON().ToJson();
+
+    // A mark step stays when the text between its ends stays, also when both ends are deleted.
+    [Fact] public void Map_Of_An_AddMark_Step_Keeps_The_Text_Between_Two_Deletions() =>
+        Assert.Equal("""{"stepType":"addMark","mark":{"type":"em"},"from":1,"to":3}""",
+                     Json(new AddMarkStep(2, 6, Em).Map(new StepMap([1, 2, 0, 5, 2, 0]))));
+
+    [Fact] public void Map_Of_A_RemoveMark_Step_Keeps_The_Text_Between_Two_Deletions() =>
+        Assert.Equal("""{"stepType":"removeMark","mark":{"type":"em"},"from":1,"to":3}""",
+                     Json(new RemoveMarkStep(2, 6, Em).Map(new StepMap([1, 2, 0, 5, 2, 0]))));
+
+    static Step StepFromJSON(string json) => Step.FromJSON(schema, StepDto.FromJson(json)!);
+
+    const string EmMarkSet = """{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"em"},"from":1,"to":3},{"stepType":"removeMark","mark":{"type":"em"},"from":2,"to":3}]}""";
+
+    [Fact] public void A_MarkSet_Step_Comes_From_JSON() =>
+        Assert.Equal(EmMarkSet, Json(StepFromJSON(EmMarkSet)));
+
+    [Fact] public void A_MarkSet_Step_Applies_Its_Steps_In_Order() =>
+        ist(StepFromJSON(EmMarkSet).Apply(doc(p("abc"))).Doc!, doc(p(em("a"), "bc")), eq);
+
+    [Fact] public void A_MarkSet_Step_Maps_Each_Step() =>
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"em"},"from":3,"to":5},{"stepType":"removeMark","mark":{"type":"em"},"from":4,"to":5}]}""",
+                     Json(StepFromJSON(EmMarkSet).Map(new StepMap([0, 0, 2]))));
+
+    [Fact] public void A_MarkSet_Step_Is_Dropped_When_Each_Step_Is_Dropped() =>
+        Assert.Null(StepFromJSON(EmMarkSet).Map(new StepMap([0, 5, 0])));
+
+    [Fact] public void A_MarkSet_Step_Inverts_Each_Step() =>
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"removeMark","mark":{"type":"em"},"from":1,"to":3}]}""",
+                     Json(StepFromJSON("""{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"em"},"from":1,"to":3}]}""").Invert(doc(p("abc")))));
+
+    [Fact] public void A_Nested_MarkSet_Step_Fails_From_JSON() =>
+        ThrowsWithMessage(() => StepFromJSON("""{"stepType":"markSet","steps":[{"stepType":"markSet","steps":[]}]}"""),
+                          "Invalid JSON for MarkSetStep");
+
+    [Fact] public void A_MarkSet_Step_Without_Steps_Fails_From_JSON() =>
+        ThrowsWithMessage(() => StepFromJSON("""{"stepType":"markSet","steps":null}"""),
+                          "Invalid JSON for MarkSetStep");
+
+    [Fact] public void A_MarkSet_Step_With_A_Replace_Step_Fails_From_JSON() =>
+        ThrowsWithMessage(() => StepFromJSON("""{"stepType":"markSet","steps":[{"stepType":"replace","from":1,"to":2}]}"""),
+                          "Invalid JSON for MarkSetStep");
+
+    static readonly Model.Mark LinkB = schema.Mark("link", new() { ["href"] = "b" });
+
+    // A link mark excludes another link mark.
+    static Node Mixed() => doc(p("x", a(new { href = "a" }, "y"), "z"));
+
+    // The inverse of a mark step restores the marks of each inline leaf. It is a "markSet" step
+    // when it has more or fewer than one step.
+    [Fact] public void Invert_Of_AddMark_Restores_An_Excluded_Mark() =>
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"removeMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":1,"to":3},{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"a","title":null}},"from":2,"to":3},{"stepType":"removeMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":3,"to":4}]}""",
+                     Json(new AddMarkStep(1, 4, LinkB).Invert(Mixed())));
+
+    [Fact] public void Invert_Of_AddMark_Cancels_The_Step() {
+        var step = new AddMarkStep(1, 4, LinkB);
+        ist(step.Invert(Mixed()).Apply(step.Apply(Mixed()).Doc!).Doc!, Mixed(), eq);
+    }
+
+    [Fact] public void Invert_Of_AddMark_Keeps_The_Mark_Where_It_Was() {
+        var d = doc(p("x", em("y"), "z"));
+        var step = new AddMarkStep(1, 4, Em);
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"removeMark","mark":{"type":"em"},"from":1,"to":2},{"stepType":"removeMark","mark":{"type":"em"},"from":3,"to":4}]}""",
+                     Json(step.Invert(d)));
+        ist(step.Invert(d).Apply(step.Apply(d).Doc!).Doc!, d, eq);
+    }
+
+    [Fact] public void Invert_Of_AddMark_Where_The_Mark_Is_Everywhere_Changes_Nothing() {
+        var d = doc(p(em("ab")));
+        var inverse = new AddMarkStep(1, 3, Em).Invert(d);
+        Assert.Equal("""{"stepType":"markSet","steps":[]}""", Json(inverse));
+        ist(inverse.Apply(d).Doc!, d, eq);
+    }
+
+    [Fact] public void Invert_Of_RemoveMark_Adds_The_Mark_Only_Where_It_Was() =>
+        Assert.Equal("""{"stepType":"addMark","mark":{"type":"em"},"from":2,"to":3}""",
+                     Json(new RemoveMarkStep(1, 4, Em).Invert(doc(p("a", em("b"), "c")))));
+
+    [Fact] public void Invert_Of_RemoveMark_Joins_Adjacent_Ranges() =>
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"em"},"from":1,"to":2},{"stepType":"addMark","mark":{"type":"em"},"from":3,"to":5}]}""",
+                     Json(new RemoveMarkStep(1, 6, Em).Invert(doc(p(em("a"), "b", em("c"), strong(em("d")), "e")))));
+
+    // The inverse of an inverse inverts each inner step, so it can nest a "markSet" step.
+    [Fact] public void Invert_Of_A_MarkSet_Step_Can_Nest_A_MarkSet_Step() {
+        var step = new AddMarkStep(1, 4, LinkB);
+        Assert.Equal("""{"stepType":"markSet","steps":[{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":1,"to":3},{"stepType":"markSet","steps":[{"stepType":"removeMark","mark":{"type":"link","attrs":{"href":"a","title":null}},"from":2,"to":3},{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":2,"to":3}]},{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":3,"to":4}]}""",
+                     Json(step.Invert(Mixed()).Invert(step.Apply(Mixed()).Doc!)));
+    }
+
+    // AddMarkStep.Apply removes an excluded mark, and its inverse restores it.
+    [Fact] public void AddMark_Removes_An_Excluded_Mark_Without_A_Separate_Step() {
+        var tr = new Transform(Mixed()).AddMark(1, 4, LinkB);
+        Assert.Equal(["""{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"b","title":null}},"from":1,"to":4}"""],
+                     tr.Steps.Select(Json));
+        ist(tr.Doc, doc(p(a(new { href = "b" }, "xyz"))), eq);
+        ist(tr.Steps[0].Invert(tr.Docs[0]).Apply(tr.Doc).Doc!, Mixed(), eq);
+    }
+
+    [Fact] public void RemoveMark_Skips_An_Inline_Node_That_Is_Not_A_Leaf() {
+        var s = new Schema(new SchemaSpec {
+            Nodes = new OrderedDictionary<string, NodeSpec> {
+                ["doc"] = new() { Content = "block+" },
+                ["paragraph"] = new() { Group = "block", Content = "inline*" },
+                ["span"] = new() { Group = "inline", Inline = true, Content = "text*" },
+                ["text"] = new() { Group = "inline" },
+            },
+            Marks = new OrderedDictionary<string, MarkSpec> { ["em"] = new() },
+        });
+        var em = s.Mark("em");
+        var d = s.Node("doc", null, new List<Node> { s.Node("paragraph", null, new List<Node> {
+            s.Text("a", [em]), s.Node("span", null, new List<Node> { s.Text("b", [em]) }), s.Text("c", [em]) }) });
+        var tr = new Transform(d).RemoveMark(1, 6, s.Marks["em"]);
+        Assert.Equal(["""{"stepType":"removeMark","mark":{"type":"em"},"from":1,"to":6}"""], tr.Steps.Select(Json));
     }
 }

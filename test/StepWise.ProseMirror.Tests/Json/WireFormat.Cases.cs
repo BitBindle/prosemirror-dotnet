@@ -59,6 +59,7 @@ public static class WireFormatCases {
         ["step: replaceAround empty"] = () => new ReplaceAroundStep(0, 5, 1, 4, Slice.Empty, 0).ToJSON().ToJson(),
         ["step: addMark"] = () => new AddMarkStep(1, 3, schema.Marks["link"].Create(new() { ["href"] = "h" })).ToJSON().ToJson(),
         ["step: removeMark"] = () => new RemoveMarkStep(1, 3, schema.Marks["em"].Create()).ToJSON().ToJson(),
+        ["step: markSet"] = () => new RemoveMarkStep(1, 4, schema.Marks["em"].Create()).Invert(doc(p(em("a"), "b", em("c")))).ToJSON().ToJson(),
         ["step: addNodeMark"] = () => new AddNodeMarkStep(1, schema.Marks["em"].Create()).ToJSON().ToJson(),
         ["step: attr null"] = () => new AttrStep(1, "title", null).ToJSON().ToJson(),
         ["step: docAttr"] = () => new DocAttrStep("x", JsonValue.Create(1)).ToJSON().ToJson(),
@@ -72,6 +73,7 @@ public static class WireFormatCases {
         ["parse step: replace structure false"] = () => ParseStep("""{"stepType":"replace","from":1,"to":2,"structure":false}"""),
         ["parse step: replaceAround"] = () => ParseStep("""{"stepType":"replaceAround","from":0,"to":5,"gapFrom":1,"gapTo":4,"insert":1,"slice":{"content":[{"type":"blockquote"}]},"structure":true}"""),
         ["parse step: addMark"] = () => ParseStep("""{"stepType":"addMark","mark":{"type":"link","attrs":{"href":"h","title":null}},"from":1,"to":3}"""),
+        ["parse step: markSet"] = () => ParseStep("""{"stepType":"markSet","steps":[{"stepType":"removeMark","mark":{"type":"link","attrs":{"href":"h"}},"from":1,"to":3},{"stepType":"addMark","mark":{"type":"em"},"from":1,"to":3}]}"""),
 
         // Attribute specs
         ["spec: no default"] = () => Spec(new AttributeSpec { Validate = "number" }),

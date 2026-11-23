@@ -39,14 +39,28 @@ public class AddMarkStep : Step {
         return StepResult.FromReplace(doc, From, To, slice);
     }
 
-    public override RemoveMarkStep Invert(Node doc) =>
-        new(From, To, Mark);
+    public override Step Invert(Node doc) {
+        var steps = new List<Step>();
+        doc.NodesBetween(From, To, (node, pos, _, _) => {
+            if (node.IsInline && node.IsAtom) {
+                var added = Mark.AddToSet(node.Marks);
+                if (!Model.Mark.SameSet(added, node.Marks)) {
+                    int from = Math.Max(From, pos), to = Math.Min(To, pos + node.NodeSize);
+                    MarkSetStep.PushMarkStep(false, from, to, Mark, steps);
+                    foreach (var mark in node.Marks)
+                        if (!mark.IsInSet(added)) MarkSetStep.PushMarkStep(true, from, to, mark, steps);
+                }
+            }
+            return true;
+        });
+        return steps.Count == 1 ? steps[0] : new MarkSetStep(steps);
+    }
 
     public override AddMarkStep? Map(IMappable mapping) {
-        var from = mapping.MapResult(From, 1);
-        var to = mapping.MapResult(To, -1);
-        if (from.Deleted && to.Deleted || from.Pos >= to.Pos) return null;
-        return new AddMarkStep(from.Pos, to.Pos, Mark);
+        var from = mapping.Map(From, 1);
+        var to = mapping.Map(To, -1);
+        if (from >= to) return null;
+        return new AddMarkStep(from, to, Mark);
     }
 
     public override AddMarkStep? Merge(Step other) {
@@ -88,14 +102,21 @@ public class RemoveMarkStep : Step {
         return StepResult.FromReplace(doc, From, To, slice);
     }
 
-    public override AddMarkStep Invert(Node doc) =>
-        new(From, To, Mark);
+    public override Step Invert(Node doc) {
+        var steps = new List<Step>();
+        doc.NodesBetween(From, To, (node, pos, _, _) => {
+            if (node.IsInline && node.IsAtom && Mark.IsInSet(node.Marks))
+                MarkSetStep.PushMarkStep(true, Math.Max(From, pos), Math.Min(To, pos + node.NodeSize), Mark, steps);
+            return true;
+        });
+        return steps.Count == 1 ? steps[0] : new MarkSetStep(steps);
+    }
 
     public override RemoveMarkStep? Map(IMappable mapping) {
-        var from = mapping.MapResult(From, 1);
-        var to = mapping.MapResult(To, -1);
-        if (from.Deleted && to.Deleted || from.Pos >= to.Pos) return null;
-        return new(from.Pos, to.Pos, Mark);
+        var from = mapping.Map(From, 1);
+        var to = mapping.Map(To, -1);
+        if (from >= to) return null;
+        return new(from, to, Mark);
     }
 
     public override RemoveMarkStep? Merge(Step other) {
@@ -116,6 +137,60 @@ public class RemoveMarkStep : Step {
 
     public static RemoveMarkStep FromJSON(Schema schema, RemoveMarkStepDto json) =>
         new(json.From, json.To, schema.MarkFromJSON(json.Mark));
+}
+
+/// <summary>A set of mark steps that apply one after the other. The inverse of an
+/// <see cref="AddMarkStep"/> or a <see cref="RemoveMarkStep"/> can be one.</summary>
+public class MarkSetStep : Step {
+    /// <summary>The steps. Each step is an <see cref="AddMarkStep"/>, a <see cref="RemoveMarkStep"/>,
+    /// or the inverse of one of them.</summary>
+    public IReadOnlyList<Step> Steps { get; }
+
+    public MarkSetStep(IReadOnlyList<Step> steps) {
+        Steps = steps;
+    }
+
+    public override StepResult Apply(Node doc) {
+        foreach (var step in Steps) {
+            var result = step.Apply(doc);
+            if (result.Doc is null) return result;
+            doc = result.Doc;
+        }
+        return StepResult.Ok(doc);
+    }
+
+    public override MarkSetStep Invert(Node doc) =>
+        new(Steps.Select(s => s.Invert(doc)).ToList());
+
+    public override MarkSetStep? Map(IMappable mapping) {
+        var result = new List<Step>();
+        foreach (var step in Steps) {
+            var mapped = step.Map(mapping);
+            if (mapped is not null) result.Add(mapped);
+        }
+        return result.Count > 0 ? new MarkSetStep(result) : null;
+    }
+
+    public override MarkSetStepDto ToJSON() =>
+        new() { Steps = Steps.Select(s => s.ToJSON()).ToList() };
+
+    public static MarkSetStep FromJSON(Schema schema, MarkSetStepDto json) {
+        if (json.Steps is null || !json.Steps.All(s => s is AddMarkStepDto or RemoveMarkStepDto))
+            throw new Exception("Invalid JSON for MarkSetStep");
+        return new(json.Steps.Select(s => Step.FromJSON(schema, s)).ToList());
+    }
+
+    /// <summary>Adds a mark step to <paramref name="target"/>. Extends the last step instead when it
+    /// is of the same kind, has the same mark and ends at <paramref name="from"/>.</summary>
+    internal static void PushMarkStep(bool add, int from, int to, Model.Mark mark, List<Step> target) {
+        var last = target.Count > 0 ? target[^1] : null;
+        if (add && last is AddMarkStep a && a.To == from && a.Mark.Eq(mark))
+            target[^1] = new AddMarkStep(a.From, to, mark);
+        else if (!add && last is RemoveMarkStep r && r.To == from && r.Mark.Eq(mark))
+            target[^1] = new RemoveMarkStep(r.From, to, mark);
+        else
+            target.Add(add ? new AddMarkStep(from, to, mark) : new RemoveMarkStep(from, to, mark));
+    }
 }
 
 public class AddNodeMarkStep : Step {
@@ -215,6 +290,12 @@ public record RemoveMarkStepDto : StepDto {
     public required MarkDto Mark { get; init; }
     public required int From { get; init; }
     public required int To { get; init; }
+}
+
+public record MarkSetStepDto : StepDto {
+    [JsonIgnore]
+    public override string StepType { get; } = "markSet";
+    public required List<StepDto> Steps { get; init; }
 }
 
 public record AddNodeMarkStepDto : StepDto {
