@@ -612,7 +612,11 @@ public class AttributeSpec {
     /// <summary>True when the default is JavaScript's <c>undefined</c> (<c>default: undefined</c>
     /// in prosemirror-model), which JSON can not hold. The attribute is then optional, and a node
     /// or mark that does not set it leaves it out of its <see cref="Model.Attrs"/>. Ignored when
-    /// <see cref="Default"/> is set.</summary>
+    /// <see cref="Default"/> is set. Not written to JSON.
+    /// <br/><br/>
+    /// <see cref="Default"/>.<see cref="AttributeDefault.IsUndefined"/> stays true, because it
+    /// means "no default given". Read <see cref="Attribute.HasDefault"/> and
+    /// <see cref="Attribute.DefaultIsUndefined"/> to know if the attribute has a default.</summary>
     [JsonIgnore]
     public bool UndefinedDefault { get; init; }
 

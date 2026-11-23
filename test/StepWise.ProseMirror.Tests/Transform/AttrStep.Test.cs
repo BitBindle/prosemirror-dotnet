@@ -11,7 +11,7 @@ using static StepWise.Prose.TestBuilder.Builder;
 
 // In prosemirror-transform, a step without a value has the value undefined. JSON leaves the
 // value out, and applying the step gives the attribute its default.
-public class AttrStepUndefinedTest {
+public class AttrStepTest {
     static readonly Schema docAttrSchema = new(new SchemaSpec {
         Nodes = new OrderedDictionary<string, NodeSpec> {
             ["doc"] = new() { Content = "text*", Attrs = new() { ["e"] = new() { Default = new(1), Validate = "number" } } },
@@ -99,5 +99,19 @@ public class AttrStepUndefinedTest {
         Assert.True(new DocAttrStepDto { Attr = "a" }.IsUndefined);
         Assert.False(new DocAttrStepDto { Attr = "a", Value = null }.IsUndefined);
         Assert.NotEqual(new AttrStepDto { Pos = 0, Attr = "a" }, new AttrStepDto { Pos = 0, Attr = "a", Value = null });
+    }
+
+    [Fact] public void SetNodeAttribute_Without_A_Value_Adds_An_Undefined_Step() {
+        var d = undefinedSchema.Node("doc", null, undefinedSchema.Node("x", new() { ["a"] = JsonValue.Create("v") }));
+        var tr = new Transform(d).SetNodeAttribute(0, "a");
+        Assert.True(((AttrStep)tr.Steps[0]).IsUndefined);
+        Assert.Equal("""{"type":"doc","attrs":{},"content":[{"type":"x","attrs":{"b":1}}]}""", tr.Doc.ToJSON().ToJson());
+    }
+
+    [Fact] public void SetDocAttribute_Without_A_Value_Adds_An_Undefined_Step() {
+        var d = undefinedSchema.Node("doc", new() { ["d"] = JsonValue.Create(1) }, undefinedSchema.Node("x"));
+        var tr = new Transform(d).SetDocAttribute("d");
+        Assert.True(((DocAttrStep)tr.Steps[0]).IsUndefined);
+        Assert.Equal("""{"type":"doc","attrs":{},"content":[{"type":"x","attrs":{"b":1}}]}""", tr.Doc.ToJSON().ToJson());
     }
 }
