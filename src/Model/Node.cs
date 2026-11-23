@@ -311,10 +311,11 @@ public record NodeDto {
     public Dictionary<string, JsonNode?>? Attrs { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<NodeDto>? Content { get; init; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Text { get; set; }
+    // Marks before text, the same key order as Node.toJSON of prosemirror-model.
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<MarkDto>? Marks { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Text { get; set; }
 
     public JsonElement ToJsonElement() =>
         JsonSerializer.SerializeToElement(this, ProseJson.JsonOptions);
