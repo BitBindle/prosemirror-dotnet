@@ -218,7 +218,7 @@ public class Fragment {
     // The end position of each child, or null. A large fragment makes it when its index searches
     // have read two times as many children as it has. Thus a fragment with few searches does not
     // make it, and it costs less than the searches before it. If two threads make it at the same
-    // time, both arrays are equal.
+    // time, both arrays are equal. Like Size, it assumes that the children do not change.
     private int[]? _childEnds;
 
     // The number of children that the index searches of a large fragment read.
@@ -231,7 +231,8 @@ public class Fragment {
             end += Content[i].NodeSize;
             ends[i] = end;
         }
-        return _childEnds = ends;
+        Volatile.Write(ref _childEnds, ends);
+        return ends;
     }
 
     // Finds the first child whose end is at or after pos, as the loop of FindIndex does.
