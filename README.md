@@ -25,36 +25,13 @@ This repository is a fork of [stepwisehq/prosemirror-dotnet](https://github.com/
 
 ## Getting Started
 
-The package is published to this fork's GitHub Packages feed. GitHub Packages needs you to sign in, even to read
-public packages, so first create a [personal access token (classic)](https://github.com/settings/tokens) with the
-`read:packages` scope. Then add the feed and install the package:
+The `BitBindle.ProseMirror` package is on nuget.org. To install it, run this command:
 
 ```bash
-dotnet nuget add source https://nuget.pkg.github.com/BitBindle/index.json --name bitbindle --username <github-username> --password <token> --store-password-in-clear-text
+dotnet add package BitBindle.ProseMirror
 ```
 
-```bash
-dotnet add package StepWise.ProseMirror --source bitbindle
-```
-
-For CI, or to keep the token out of your user config, put the feed in a `nuget.config` next to your solution and
-read the credentials from environment variables. In GitHub Actions, `GITHUB_ACTOR` and `GITHUB_TOKEN` work as is,
-as long as the workflow has `packages: read` permission:
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <add key="bitbindle" value="https://nuget.pkg.github.com/BitBindle/index.json" />
-  </packageSources>
-  <packageSourceCredentials>
-    <bitbindle>
-      <add key="Username" value="%GITHUB_ACTOR%" />
-      <add key="ClearTextPassword" value="%GITHUB_TOKEN%" />
-    </bitbindle>
-  </packageSourceCredentials>
-</configuration>
-```
+The package ID differs from the ID of the original package (`StepWise.ProseMirror`). The assembly name and the namespaces stay the same. A project cannot reference both packages, because they contain the same assembly name.
 
 ### Basic Usage
 

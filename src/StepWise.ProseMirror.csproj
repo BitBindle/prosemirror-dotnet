@@ -4,9 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <PackageId>StepWise.ProseMirror</PackageId>
+    <PackageId>BitBindle.ProseMirror</PackageId>
     <Version>2.0.0</Version>
-    <Authors>ProTip</Authors>
+    <Authors>ProTip, BitBindle</Authors>
     <Company>StepWise</Company>
     <Description>A direct translation of the core ProseMirror packages from TypeScript to C#</Description>
     <PackageProjectUrl>https://github.com/BitBindle/prosemirror-dotnet</PackageProjectUrl>

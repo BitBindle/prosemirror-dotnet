@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  packages: write
+  contents: write # create the tag and the release
+  id-token: write # get a short-lived nuget.org API key with trusted publishing
 
 concurrency:
   group: release
@@ -16,9 +16,6 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      # Optional: when this secret is set, the package is also pushed to nuget.org.
-      NUGET_API_KEY: ${{ secrets.NUGET_API_PUB_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,6 +44,24 @@ jobs:
           echo "Releasing $version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      # nuget.org refuses a version that it already has. The check stops the workflow before it creates the tag.
+      # The flat container returns 404 when the package ID does not exist yet. This is the case for the first release.
+      - name: Check that nuget.org does not have the version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          url="https://api.nuget.org/v3-flatcontainer/bitbindle.prosemirror/index.json"
+          status="$(curl --silent --show-error --output versions.json --write-out '%{http_code}' "$url")"
+          if [[ "$status" == 200 ]]; then
+            if jq --exit-status --arg v "${VERSION,,}" '.versions | index($v)' versions.json > /dev/null; then
+              echo "::error::nuget.org already has BitBindle.ProseMirror $VERSION."
+              exit 1
+            fi
+          elif [[ "$status" != 404 ]]; then
+            echo "::error::nuget.org returned HTTP $status for $url"
+            exit 1
+          fi
+
       - name: Restore
         run: dotnet restore prosemirror-dotnet.slnx
 
@@ -73,19 +88,18 @@ jobs:
           --generate-notes
           artifacts/*.nupkg
 
-      # GitHub Packages links the package to the repository named by RepositoryUrl, which must be
-      # this repository for GITHUB_TOKEN to be allowed to publish it.
-      - name: Push to GitHub Packages
-        run: >
-          dotnet nuget push "artifacts/*.nupkg"
-          --api-key "${{ github.token }}"
-          --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
-          --skip-duplicate
+      # Trusted publishing. The action exchanges the OIDC token of the workflow for a short-lived API key.
+      # The secret NUGET_USER holds the nuget.org user name (not the e-mail address) of the policy owner.
+      - name: Log in to nuget.org
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
 
-      - name: Push to NuGet
-        if: ${{ env.NUGET_API_KEY != '' }}
+      - name: Push to nuget.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: >
           dotnet nuget push "artifacts/*.nupkg"
           --api-key "$NUGET_API_KEY"
           --source https://api.nuget.org/v3/index.json
-          --skip-duplicate
