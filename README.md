@@ -25,10 +25,10 @@ This repository is a fork of [stepwisehq/prosemirror-dotnet](https://github.com/
 
 ## Getting Started
 
-The `BitBindle.StepWise.ProseMirror` package is on nuget.org. To install it, run this command:
+The `BitBindle.ProseMirror` package is on nuget.org. To install it, run this command:
 
 ```bash
-dotnet add package BitBindle.StepWise.ProseMirror
+dotnet add package BitBindle.ProseMirror
 ```
 
 The package ID differs from the ID of the original package (`StepWise.ProseMirror`). The assembly name and the namespaces stay the same. A project cannot reference both packages, because they contain the same assembly name.

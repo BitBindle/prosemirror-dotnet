@@ -50,11 +50,11 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          url="https://api.nuget.org/v3-flatcontainer/bitbindle.stepwise.prosemirror/index.json"
+          url="https://api.nuget.org/v3-flatcontainer/bitbindle.prosemirror/index.json"
           status="$(curl --silent --show-error --output versions.json --write-out '%{http_code}' "$url")"
           if [[ "$status" == 200 ]]; then
             if jq --exit-status --arg v "${VERSION,,}" '.versions | index($v)' versions.json > /dev/null; then
-              echo "::error::nuget.org already has BitBindle.StepWise.ProseMirror $VERSION."
+              echo "::error::nuget.org already has BitBindle.ProseMirror $VERSION."
               exit 1
             fi
           elif [[ "$status" != 404 ]]; then
