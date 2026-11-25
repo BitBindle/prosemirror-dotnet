@@ -61,6 +61,14 @@ public class AttributeList : Dictionary<string, Attribute> {
         return defaultAttrs;
     }
 
+    // Throws when the values have an attribute that is not in this list, or a value that fails its validation.
+    internal void Check(Attrs values, string type, string name) {
+        foreach (var (attr, _) in values)
+            if (!ContainsKey(attr)) throw new Exception($"Unsupported attribute {attr} for {type} of type {name}");
+        foreach (var (attr, spec) in this)
+            spec.Check(values, attr);
+    }
+
     public Attrs ComputeAttrs(Attrs? value) {
         var built = new Attrs();
         foreach (var (name, attr) in this) {
@@ -238,6 +246,13 @@ public class NodeType {
             throw new Exception($"Invalid content for node {Name}: {content.ToString().slice(0, 50)}");
     }
 
+    /// <summary>Throws when the given attributes do not fit this node type: an attribute
+    /// that the type does not define, or a value that fails the <c>validate</c> of its
+    /// attribute. For an attribute that is not in <c>attrs</c>, a <c>validate</c> type list
+    /// checks the type <c>undefined</c>, and a validate function gets <c>null</c>.
+    /// <see cref="Model.Node.Check"/> does this check for each node and each mark.</summary>
+    public void CheckAttrs(Attrs attrs) => Attrs.Check(attrs, "node", Name);
+
     /// <summary>Check whether the given mark type is allowed in this node.</summary>
     public bool AllowsMarkType(MarkType markType) {
         return MarkSet is null || MarkSet.Contains(markType);
@@ -363,6 +378,12 @@ public class MarkType {
         if (attrs is null && Instance is not null) return Instance;
         return new Mark(this, Attrs.ComputeAttrs(attrs));
     }
+
+    /// <summary>Throws when the given attributes do not fit this mark type: an attribute
+    /// that the type does not define, or a value that fails the <c>validate</c> of its
+    /// attribute. For an attribute that is not in <c>attrs</c>, a <c>validate</c> type list
+    /// checks the type <c>undefined</c>, and a validate function gets <c>null</c>.</summary>
+    public void CheckAttrs(Attrs attrs) => Attrs.Check(attrs, "mark", Name);
 
     public static Dictionary<string, MarkType> Compile(OrderedDictionary<string, MarkSpec> marks, Schema schema) {
         var result = new Dictionary<string, MarkType>();
