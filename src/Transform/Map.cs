@@ -127,24 +127,33 @@ public class StepMap : IMappable {
 }
 
 public class Mapping : IMappable {
-    public List<StepMap> Maps { get; }
+    public List<StepMap> Maps { get; private set; }
     public List<int>? Mirror { get; set; }
     public int From { get; set; }
     public int To { get; set; }
+    // False while the maps or the mirror are the lists that the caller gave. AppendMap copies
+    // them before the first change, as prosemirror-transform does.
+    private bool _ownData;
 
     public Mapping(List<StepMap>? maps =  null, List<int>? mirror = null, int from = 0, int? to = null) {
         Maps = maps ?? new();
         Mirror = mirror;
         From = from;
         To = to ?? Maps.Count;
+        _ownData = maps is null && mirror is null;
     }
 
     public Mapping Slice(int from = 0, int? to = null) =>
-        new(Maps.slice(), Mirror?.slice() ?? null, from, to ?? Maps.Count);
+        new(Maps.slice(), Mirror?.slice() ?? null, from, to ?? Maps.Count) { _ownData = true };
 
-    public Mapping Copy => new(Maps.slice(), Mirror?.slice() ?? null, From, To);
+    public Mapping Copy => new(Maps.slice(), Mirror?.slice() ?? null, From, To) { _ownData = true };
 
     public void AppendMap(StepMap map, int? mirrors = null) {
+        if (!_ownData) {
+            Maps = Maps.slice();
+            Mirror = Mirror?.slice();
+            _ownData = true;
+        }
         Maps.Add(map);
         To = Maps.Count;
         if (mirrors is not null) SetMirror(Maps.Count - 1, mirrors.Value);

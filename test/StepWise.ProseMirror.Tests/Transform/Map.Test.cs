@@ -121,5 +121,31 @@ public class MappingTest {
         testDel(mk((3, 1, 0), (0, 2, 0)), 2, -1, "db");
     }
 
+    [Fact] public void Does_Not_Change_The_Maps_Given_To_The_Constructor() {
+        var maps = new List<StepMap> { new([0, 0, 2]) };
+        var mapping = new Mapping(maps);
+        mapping.AppendMap(new StepMap([0, 0, 3]));
+        Assert.Single(maps);
+        Assert.Equal(2, mapping.Maps.Count);
+        Assert.Equal(5, mapping.Map(0));
+    }
 
+    [Fact] public void Does_Not_Change_The_Mirror_Given_To_The_Constructor() {
+        var map = new StepMap([0, 0, 2]);
+        var mirror = new List<int> { 0, 1 };
+        var mapping = new Mapping([map, map.Invert()], mirror);
+        mapping.AppendMap(map, 1);
+        Assert.Equal([0, 1], mirror);
+        Assert.Equal(1, mapping.GetMirror(2));
+    }
+
+    [Fact] public void A_Slice_Does_Not_Change_The_Original() {
+        var mapping = new Mapping();
+        mapping.AppendMap(new StepMap([0, 0, 2]));
+        var slice = mapping.Slice();
+        slice.AppendMap(new StepMap([0, 0, 3]), 0);
+        Assert.Single(mapping.Maps);
+        Assert.Null(mapping.Mirror);
+        Assert.Equal(2, slice.Maps.Count);
+    }
 }
